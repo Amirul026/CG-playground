@@ -12,11 +12,10 @@ import { skyMesh } from './world.js';
    theta is the angle around the target, phi the angle down from straight up.
    ========================================================================== */
 const CAM_PRESETS = [
-  { name: 'Orbit', target: [1, 8, -20], phi: 1.1, dist: 125, auto: true, minD: 70, maxD: 260, phiMin: 0.12, phiMax: 1.5 },
+  { name: 'Orbit', target: [1, 9, -2], phi: 1.16, dist: 72, auto: true, minD: 34, maxD: 180, phiMin: 0.12, phiMax: 1.5 },
   { name: 'Playground', target: [0, 1.2, 35], phi: 1.08, dist: 30, auto: true, minD: 9, maxD: 90, phiMin: 0.12, phiMax: 1.5 },
-  { name: 'Entrance', target: [1, 6, 6], phi: 1.42, dist: 34, theta: Math.PI / 2, auto: false, minD: 14, maxD: 70, phiMin: 0.9, phiMax: 1.54 },
-  { name: 'Courtyard', target: [1, 4, -36], phi: 0.8, dist: 42, auto: true, minD: 16, maxD: 70, phiMin: 0.3, phiMax: 1.2 },
-  { name: 'Overhead', target: [2, 0, -12], phi: 0.06, dist: 190, auto: false, minD: 90, maxD: 300, phiMin: 0.02, phiMax: 0.6 }
+  { name: 'Street', target: [1, 1.7, -3], look: [1, 10, -3], phi: 1.53, dist: 44, auto: true, minD: 36, maxD: 80, phiMin: 1.36, phiMax: 1.555 },
+  { name: 'Overhead', target: [0, 0, 10], phi: 0.06, dist: 125, auto: false, minD: 60, maxD: 200, phiMin: 0.02, phiMax: 0.6 }
 ];
 const CAM_MODES = CAM_PRESETS.map(p => p.name);
 
@@ -27,8 +26,8 @@ const orbit = {
   distGoal: 110,
   auto: true,           // the camera moves around the building on its own
   autoSpeed: 0.11,      // radians per second
-  target: new THREE.Vector3(1, 8, -20),
-  targetGoal: new THREE.Vector3(1, 8, -20),
+  target: new THREE.Vector3(1, 9, -2),
+  targetGoal: new THREE.Vector3(1, 9, -2),
   look: null
 };
 
@@ -50,8 +49,7 @@ function applyPreset(i, keepTheta) {
   orbit.phi = p.phi;
   orbit.distGoal = p.dist;
   orbit.auto = p.auto;
-  if (p.theta !== undefined) orbit.theta = p.theta;
-  else if (!keepTheta) orbit.theta = wrapAngle(orbit.theta);
+  if (!keepTheta) orbit.theta = wrapAngle(orbit.theta);
 }
 function preset() { return CAM_PRESETS[ctl.camMode]; }
 
@@ -202,7 +200,7 @@ function onKey(e) {
       orbit.auto = !orbit.auto;
       toast(orbit.auto ? 'Camera <b>circling</b> on its own' : 'Camera <b>held</b> &mdash; arrows or drag to move it');
       break;
-    case '1': case '2': case '3': case '4': case '5':
+    case '1': case '2': case '3': case '4':
       setCamMode(+k - 1); break;
     case 'c':
       setCamMode((ctl.camMode + 1) % CAM_MODES.length); break;

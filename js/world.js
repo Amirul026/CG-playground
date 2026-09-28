@@ -8,12 +8,12 @@ import { addGlowHead, setSkyMaterial } from './lighting.js';
 
 /* ----------------------------------------------------------------------------
    SITE PLAN (metres, y up, the building's front faces +z)
-     campus        x -32 … 34, z -70 … 16 (see building.js)
-     campus paving x -36 … 38, z -76 … 17 (the courtyard included)
+     building      x -22 … 24, z -17 … 15.6 (stairs included)
+     forecourt     x -28 … 30, z -24 … 17
      path          x ±2,    z 17 … 22
      playground    x ±20,   z 22 … 48
    ---------------------------------------------------------------------------- */
-const PLAZA = { x0: -36, x1: 38, z0: -76, z1: 17 };
+const PLAZA = { x0: -28, x1: 30, z0: -24, z1: 17 };
 const PLAY = { x0: -20, x1: 20, z0: 22, z1: 48 };
 
 /* is a point on grass, clear of the paving, playground and a margin round them */
@@ -140,16 +140,12 @@ function buildTrees() {
   const rand = rng(4242);
 
   /* a hand placed avenue along the west side, then a scatter further out */
-  for (let z = -70; z <= 44; z += 8) TREES.push({ x: -41 + (rand() - 0.5) * 1.5, z, s: 0.9 + rand() * 0.25 });
-  for (let x = -32; x <= 32; x += 8) TREES.push({ x, z: -82 + (rand() - 0.5) * 1.5, s: 0.95 + rand() * 0.2 });
-  /* big trees on the forecourt and in the courtyard, as in the photographs */
-  for (const [x, z, sc] of [[-26, 7, 1.3], [31, 9, 1.1], [-8, -32, 1.2], [9, -40, 1.1], [0, -46, 1.0], [14, -28, 0.9], [-4, -26, 0.9]]) {
-    TREES.push({ x, z, s: sc });
-  }
+  for (let z = -20; z <= 44; z += 8) TREES.push({ x: -33 + (rand() - 0.5) * 1.5, z, s: 0.9 + rand() * 0.25 });
+  for (let x = -24; x <= 24; x += 8) TREES.push({ x, z: -29 + (rand() - 0.5) * 1.5, s: 0.95 + rand() * 0.2 });
   let tries = 0;
-  while (TREES.length < 110 && tries++ < 3000) {
-    const a = rand() * TAU, r = 45 + Math.pow(rand(), 0.7) * 120;
-    const x = Math.cos(a) * r, z = -20 + Math.sin(a) * r;
+  while (TREES.length < 90 && tries++ < 3000) {
+    const a = rand() * TAU, r = 30 + Math.pow(rand(), 0.7) * 120;
+    const x = Math.cos(a) * r, z = 8 + Math.sin(a) * r;
     if (!isOpenLawn(x, z, 5)) continue;
     if (TREES.some(t => (t.x - x) ** 2 + (t.z - z) ** 2 < 36)) continue;
     TREES.push({ x, z, s: 0.8 + rand() * 0.6 });
@@ -203,8 +199,8 @@ function buildGrassTufts() {
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
   let n = 0;
   for (let tries = 0; n < N && tries < N * 5; tries++) {
-    const ang = rand() * TAU, r = 3 + Math.sqrt(rand()) * 110;
-    const x = Math.cos(ang) * r, z = -10 + Math.sin(ang) * r;
+    const ang = rand() * TAU, r = 3 + Math.sqrt(rand()) * 95;
+    const x = Math.cos(ang) * r, z = 10 + Math.sin(ang) * r;
     if (!isOpenLawn(x, z, 0.6)) continue;
     q.setFromAxisAngle(_up, rand() * TAU);
     s.set(0.8 + rand() * 0.7, 0.6 + rand() * 0.9, 1);
@@ -223,7 +219,7 @@ function buildGrassTufts() {
    ========================================================================== */
 function buildStreetLamps() {
   const poleMat = new THREE.MeshStandardMaterial({ map: TEX.metalDark, metalness: 0.7, roughness: 0.4 });
-  const spots = [[-26.5, 14.5], [28.5, 14.5], [-38.5, -30], [40.5, -30], [-22.5, 30], [22.5, 42]];
+  const spots = [[-26.5, -20], [28.5, -20], [-26.5, 14.5], [28.5, 14.5], [-22.5, 30], [22.5, 42]];
   for (const [x, z] of spots) {
     const g = new THREE.Group();
     const base = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.5, 12),

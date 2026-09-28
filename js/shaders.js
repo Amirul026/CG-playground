@@ -18,23 +18,24 @@ float fbm(vec2 p){
   return v;
 }`;
 
-/* every lit program reads the one light; lighting.js writes it each frame */
+
 const GLSL_LIGHTS = `
 uniform vec3  uSunDir;      // toward the light that circles the building
 uniform vec3  uSunColor;
 uniform float uSunPower;
-uniform vec3  uSkyTint;     // only for what glass reflects, it lights nothing
+uniform vec3  uSkyTint;    
 uniform vec3  uCamPos;
 uniform vec3  uFogColor;
 uniform float uFogDensity;
+uniform vec3  uAmbient;     
 
-/* Blinn-Phong from the one light: a diffuse term and a specular term.
-   There is no ambient term, because the scene has no other light */
 vec3 shade(vec3 albedo, vec3 N, vec3 V, vec3 P, float shininess, float specular){
   vec3 L = normalize(uSunDir);
   float ndl = max(dot(N, L), 0.0);
   vec3 H = normalize(L + V);
-  return uSunColor * uSunPower * ndl * (albedo + specular * pow(max(dot(N, H), 0.0), shininess));
+  vec3 direct = uSunColor * uSunPower * ndl * (albedo + specular * pow(max(dot(N, H), 0.0), shininess));
+  float hemi = 0.5 + 0.5 * N.y;   // 1 = faces up, 0 = faces down
+  return direct + uAmbient * albedo * hemi;
 }
 
 vec3 addFog(vec3 col, float dist){
@@ -53,11 +54,12 @@ function lightUniforms() {
     uSkyTint: { value: new THREE.Color(0.45, 0.58, 0.75) },
     uCamPos: { value: new THREE.Vector3() },
     uFogColor: { value: new THREE.Color(0.66, 0.74, 0.8) },
-    uFogDensity: { value: 0.0036 }
+    uFogDensity: { value: 0.0055 },
+    uAmbient: { value: new THREE.Color(0.08, 0.10, 0.14) }  
   };
 }
 
-/* the vertex stage most programs share: world position, world normal, uv */
+/*world normal */
 const VERT_WORLD = `
 varying vec2 vUv; varying vec3 vN; varying vec3 vWP;
 void main(){
@@ -68,10 +70,7 @@ void main(){
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
-/* ============================================================================
-   SKY — a dome drawn from the view direction: a three stop gradient, the sun
-   and its halo, a moon opposite the sun, stars and a drifting cloud layer
-   ========================================================================== */
+
 function makeSkyMaterial() {
   return new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
@@ -106,19 +105,19 @@ function makeSkyMaterial() {
                             : mix(mid, uZenith, smoothstep(0.22, 0.8, h));
         col = mix(uGround, col, smoothstep(-0.14, 0.01, h));
 
-        /* the disc sits exactly in the direction of the scene's one light,
-           so it travels round the sky as the light circles the building:
-           the sun by day, the moon by night */
+       
         float sd = max(dot(d, S), 0.0);
         float day = uDay * uLightOn, night = (1.0 - uDay) * uLightOn;
         col += uHorizon * pow(sd, 5.0) * 0.18 * day;               // warm halo
         col += vec3(1.0, 0.93, 0.78) * smoothstep(0.9986, 0.9997, sd) * 8.0 * day;
         col += vec3(1.0, 0.85, 0.6) * pow(sd, 300.0) * 1.5 * day;
-        col += vec3(0.85, 0.9, 1.0) * smoothstep(0.9990, 0.9996, sd) * 2.4 * night;
-        col += vec3(0.3, 0.38, 0.6) * pow(sd, 60.0) * 0.25 * night;
+        /* moon — larger disc, atmospheric halo layers so it reads clearly */
+        col += vec3(0.12, 0.16, 0.38) * pow(sd, 4.0)  * 0.35 * night;   // wide outer glow
+        col += vec3(0.25, 0.33, 0.62) * pow(sd, 18.0) * 0.55 * night;   // inner corona
+        col += vec3(0.80, 0.88, 1.00) * smoothstep(0.9975, 0.9991, sd) * 4.0 * night;  
+        col += vec3(0.96, 0.97, 1.00) * smoothstep(0.9992, 0.9997, sd) * 6.5 * night;  
 
-        /* stars: one chance per cell of a grid on the dome, a small round
-           point placed at random inside its cell, twinkling */
+        /* stars ,twinkling */
         if (h > 0.0) {
           vec2 g = d.xz / (h + 0.35) * 160.0;
           vec2 id = floor(g), f = fract(g) - 0.5;
@@ -144,17 +143,7 @@ function makeSkyMaterial() {
   });
 }
 
-/* ============================================================================
-   FACADE — the building's own program.
-   Two skins are bound at once. uMix runs 0 → 1 and a wipe front climbs the
-   building from the ground to the roof; below the front the new skin shows,
-   above it the old one, and the front itself glows as it passes. The front is
-   pushed about by noise so it reads as a painted edge rather than a ruler
-   line. A shared mask marks glass and frame, so glass gets a sharper
-   highlight and a sky reflection, and at night a random set of rooms light up.
-   The walls are swept along curved footprints, so the program works from
-   world position and normal rather than assuming a flat box.
-   ========================================================================== */
+
 function makeFacadeMaterial(skinA, mask, topY) {
   return registerShaded(new THREE.ShaderMaterial({
     uniforms: Object.assign(lightUniforms(), {
@@ -223,8 +212,12 @@ function makeFacadeMaterial(skinA, mask, topY) {
 
         /* --- the glowing edge of the wipe --- */
         float wiping = step(0.001, uMix) * step(uMix, 0.999);
-        float seam = 1.0 - smoothstep(0.0, 0.022, abs(hw - front));
-        col += vec3(1.0, 0.62, 0.30) * seam * wiping * 1.5;
+        float seam      = 1.0 - smoothstep(0.0,   0.018, abs(hw - front));   // sharp core line
+        float seamGlow  = 1.0 - smoothstep(0.0,   0.042, abs(hw - front));   // warm halo
+        /* Keep the glow well below 1.0 so ACES doesn't clip it to white.
+           Strong saturated orange reads as a paint / fire edge, not a flash. */
+        col += vec3(1.0, 0.50, 0.10) * seam     * wiping * 1.4;
+        col += vec3(0.8, 0.30, 0.06) * seamGlow * wiping * 0.55;
 
         col = addFog(col, length(uCamPos - vWP));
         gl_FragColor = vec4(col, 1.0);
@@ -234,10 +227,7 @@ function makeFacadeMaterial(skinA, mask, topY) {
   }));
 }
 
-/* ============================================================================
-   FLAG — a travelling wave in the vertex shader. The wave grows away from the
-   pole (uv.x = 0) and the normal is rebuilt from the slope of the wave.
-   ========================================================================== */
+
 function makeFlagMaterial(map) {
   return registerShaded(new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
@@ -251,7 +241,7 @@ function makeFlagMaterial(map) {
         float k = uv.x;
         float ph = uv.x * 7.0 - uTime * 5.5 + uv.y * 1.2;
         p.z += sin(ph) * 0.22 * k;
-        p.y -= k * k * 0.18;                                     // sags a little at the fly end
+        p.y -= k * k * 0.18;                                     
         float slope = cos(ph) * 0.22 * k * 7.0 / 3.0;
         vec3 n = normalize(vec3(-slope, 0.0, 1.0));
         vN = normalize(mat3(modelMatrix) * n);
@@ -278,10 +268,7 @@ function makeFlagMaterial(map) {
   }));
 }
 
-/* ============================================================================
-   GRASS TUFTS — one instanced quad pair per tuft, bent by the wind. The bend
-   grows with height (uv.y) so the roots stay planted.
-   ========================================================================== */
+
 function makeGrassMaterial(map) {
   return registerShaded(new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
@@ -310,7 +297,7 @@ function makeGrassMaterial(map) {
         vec3 N = vec3(0.0, 1.0, 0.0);
         vec3 V = normalize(uCamPos - vWP);
         vec3 col = shade(t.rgb, N, V, vWP, 8.0, 0.0);
-        col *= 0.75 + 0.25 * vUv.y;                              // darker near the soil
+        col *= 0.75 + 0.25 * vUv.y;                            
         col = addFog(col, length(uCamPos - vWP));
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
@@ -319,12 +306,7 @@ function makeGrassMaterial(map) {
   }));
 }
 
-/* ============================================================================
-   LAWN — the standard material, extended. The grass texture is mixed with a
-   copy of itself at a much larger scale so the repeat disappears, mowing
-   stripes are laid across the lawn near the building, and the soil shows
-   through where people walk to the playground gate.
-   ========================================================================== */
+
 function attachLawnShader(mat, dirtTex) {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uDirt = { value: dirtTex };

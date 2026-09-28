@@ -3,33 +3,22 @@ import { TAU, lerp, smoothstep } from './helpers.js';
 import { SHADED } from './shaders.js';
 import { camera, renderer, scene } from './renderer.js';
 
-/* ----------------------------------------------------------------------------
-   ONE LIGHT. The brief says the light position rotates around the building,
-   so the scene has exactly one light source: a directional light whose
-   position circles the building. There is no ambient light, no hemisphere
-   light, no environment map, no lamp posts that light anything. The side of
-   the building facing away from the light is in its own shadow, and as the
-   light goes round, each face comes into the light in turn.
 
-   Nothing marks the light in the scene itself; the sun disc painted by the
-   sky shader sits in the light's direction, so you can see where the light
-   is by looking at the sky.
-   ---------------------------------------------------------------------------- */
 
-/* the centre of the building footprint; the light and the camera both circle it */
-const SITE_CENTER = new THREE.Vector3(1, 0, -22);
-const LIGHT_DISTANCE = 170;          // how far out the light sits, metres
 
-let sun = null;                      // the one light
+const SITE_CENTER = new THREE.Vector3(1, 0, -3);
+const LIGHT_DISTANCE = 130;         
+
+let sun = null;                      
 let skyMat = null;
-const glowHeads = [];                // street lamp heads: they glow, they do not light
+const glowHeads = [];                
 
-/* --- the light the brief asks for: its position rotates around the building --- */
+
 const orbitLight = {
-  angle: 0.6,          // radians around the building
-  elevation: 0.72,     // radians above the horizon
-  speed: 0.22,         // radians per second while it runs on its own
-  auto: true,          // false while it is held or stepped by hand (J, Z / X)
+  angle: 0.6,          
+  elevation: 0.72,    
+  speed: 0.22,         
+  auto: true,          
   on: true,
   shadows: true,
   colourIndex: 0
@@ -41,19 +30,26 @@ const LIGHT_COLOURS = [
   { name: 'rose', hex: 0xff9fb8 }
 ];
 
+let ambientLight = null;
+
 function initLights() {
   sun = new THREE.DirectionalLight(LIGHT_COLOURS[0].hex, 3.2);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096);
+  sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 10;
-  sun.shadow.camera.far = 360;
-  sun.shadow.camera.left = -78; sun.shadow.camera.right = 78;
-  sun.shadow.camera.top = 78; sun.shadow.camera.bottom = -78;
+  sun.shadow.camera.far = 280;
+  sun.shadow.camera.left = -58; sun.shadow.camera.right = 58;
+  sun.shadow.camera.top = 58; sun.shadow.camera.bottom = -58;
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.4;
-  sun.target.position.set(2, 0, -11);     // middle of campus + playground, so both stay in the shadow map
+  sun.target.position.set(1, 0, 12);      // middle of building + playground, so both stay in the shadow map
   scene.add(sun);
   scene.add(sun.target);
+
+  /* very dim ambient so THREE.js built-in materials (ground, trims) also get
+     a fill; intensity is updated every frame to match the day / night cycle */
+  ambientLight = new THREE.AmbientLight(0x9fb4e8, 0.18);
+  scene.add(ambientLight);
 }
 
 function addGlowHead(mat) { glowHeads.push(mat); }
@@ -118,19 +114,35 @@ function updateSky() {
 
   /* lamp heads and the like glow at night; they are emissive, not lights */
   for (const m of glowHeads) m.emissiveIntensity = 0.1 + nightFactor * 3.0;
+
+  /* dim ambient for built-in THREE materials — sky blue by day, moonlit blue at night */
+  if (ambientLight) {
+    ambientLight.color.set(dayFactor > 0.5 ? 0xb8cfe8 : 0x9fb4e8);
+    ambientLight.intensity = lerp(0.18, 0.06, dayFactor);   // brighter at night (relative to sun)
+  }
 }
+
+/* Ambient colour for the hand-written shaders: sky-blue fill by day,
+   cool moonlit blue at night.  Kept as a module-level colour so we only
+   allocate once. */
+const _ambient = new THREE.Color();
 
 /* push the one light into every hand-written shader */
 function updateShaderLights() {
+  /* day: a gentle sky-tinted fill; night: a soft cool moonlit blue */
+  const ambDay = 0.13, ambNight = 0.22;
+  _ambient.copy(_sky).multiplyScalar(lerp(ambNight, ambDay, dayFactor));
+
   for (const m of SHADED) {
     const u = m.uniforms;
     u.uSunDir.value.copy(lightDir);
     u.uSunColor.value.copy(sun.color);
-    u.uSunPower.value = sun.intensity * 0.36;
+    u.uSunPower.value = sun.intensity * 0.21;   // keep textures in readable contrast range
     u.uSkyTint.value.copy(_sky).lerp(scene.fog.color, 0.4);
     u.uCamPos.value.copy(camera.position);
     u.uFogColor.value.copy(scene.fog.color);
     u.uFogDensity.value = scene.fog.density;
+    u.uAmbient.value.copy(_ambient);
   }
 }
 

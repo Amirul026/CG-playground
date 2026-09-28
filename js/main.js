@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { UI, clamp, lerp, nextFrame, smoothstep, step, toast, toggleInfo, wrapAngle } from './helpers.js';
 import {
-  SKINS, TEX, buildSkin, texConcretePanel, texLettering, texLouver, texNameBoard, texRedPaving, texTerracotta, texBark, texCarousel, texConcrete, texDirt, texDoor, texFlag, texGlow, texGrass, texLeaf,
+  SKINS, TEX, texArchSign, texRedPaving, texTerracotta, texBark, texCarousel, texConcrete, texDirt, texDoor, texFlag, texGlow, texGrass, texLeaf,
   texMetal, texPaint, texPaving, texPlaque, texRoof, texRubber, texSand, texSolar, texTuft, texVent,
   texWindowMask, texWood
 } from './textures.js';
@@ -17,8 +17,8 @@ import { CAM_MODES, applyPreset, ctl, initInteraction, keys, orbit, preset } fro
    S1  TEAM — edit these two lines; the start screen and the notes use them
    ========================================================================== */
 const TEAM = [
-  { name: 'Your Name', id: '2022010XXXX' },
-  { name: 'Partner Name', id: '2022010XXXX' }
+  { name: 'Eusha Ahmed Mahi', id: '20220104032' },
+  { name: 'Amirul Momin Utshaw', id: '20220104042' }
 ];
 
 /* ============================================================================
@@ -36,7 +36,7 @@ const REQUIREMENTS = [
     'THREE.PerspectiveCamera at a 50&deg; field of view. <b>P</b> swaps in an orthographic camera on the same position so the two can be compared; <b>[</b> <b>]</b> change the field of view.'],
   ['Texture for each object',
     '<code>textures.js</code> &mdash; the TEX library',
-    'About forty textures, all painted onto canvases at load time from tileable value noise and 2D drawing: three window layouts (ribbon glazing, square windows, courtyard corridors) each in five colour schemes, with a window mask per layout, terracotta panels, herringbone brick paving, lawn, soil, sand, rubber, roof, concrete, timber, paint, steel, bark, leaves, doors, the name boards, the flag of Bangladesh and the merry-go-round deck.'],
+    'About thirty textures, all painted onto canvases at load time from tileable value noise and 2D drawing: five ribbon-window facade skins and a window mask, terracotta panels, herringbone brick paving, lawn, soil, sand, rubber, roof, concrete, timber, paint, steel, bark, leaves, doors, the name boards, the flag of Bangladesh and the merry-go-round deck.'],
   ['Animation',
     '<code>animation.js</code> &mdash; updateOrbitLight, updatePlayground, <code>building.js</code> updateFacade, updateRoof',
     'The light circles the building, the facade wipes to a new skin every 12 s, the swings move as pendulums (&omega; = &radic;(g / L)), the see-saw rocks, the merry-go-round is pushed and coasts, the spring rider bounces, the roof fans spin, the beacon blinks, the flag waves and the grass sways. <b>Space</b> pauses it all.'],
@@ -44,17 +44,17 @@ const REQUIREMENTS = [
     '<code>interaction.js</code> &mdash; initInteraction, onKey, pickObject',
     'Drag to turn the camera, wheel or pinch to zoom, click any object to have it named by a ray cast. The keyboard list is on the start screen and in the hints bar.'],
   ['Task &mdash; a building [with texture]',
-    '<code>building.js</code> &mdash; wallAlong, block, buildTower, buildRightBlock, buildWings, buildPergola, buildTerraces, buildGateWall',
-    'The AUST campus in Tejgaon, laid out from street, drone, courtyard and satellite photographs: a ring of eight storey wings round a courtyard; at the front a terracotta tower lettered AUST, a glass block with projecting floor slabs, a lower centre block reached by twelve steps under a flat criss-cross pergola carrying the Bengali and English name board, and a white block whose lower floors are cut away over columns, with brick panels and a louvred window band; open corridors face the courtyard, curved terraces step up in one corner, and a panel wall with a red disc lines the street.'],
+    '<code>building.js</code> &mdash; wallAlong, bandAlong, buildRedTower, buildGlassBlock, buildWhiteBlock, buildCourtAndStairs, buildArch',
+    'Modelled on the AUST main entrance: an eight storey terracotta tower, a glass block with a rounded corner, a curved white block whose first floor sweeps out over columns, a twelve step grand staircase with planters and rails up to a raised court, and a segmental ribbed arch with a translucent canopy carrying the university name board. The glazed walls are swept along curved footprints by hand, with texture coordinates counting bays and storeys.'],
   ['Task &mdash; a playground [with texture]',
     '<code>playground.js</code>',
     'Rubber safety floor, fence with a gate arch, swings on chains, a slide whose chute is swept along a curve by hand, see-saw, merry-go-round, climbing dome built from the edges of an icosahedron, sandpit, spring rider and benches.'],
   ['Task &mdash; the camera moves around the building',
     '<code>main.js</code> updateCamera, <code>interaction.js</code> onKey',
-    'By default the camera circles the building on its own. <b>&larr; &rarr;</b> (or <b>Q</b> <b>E</b>) move it round, <b>&uarr; &darr;</b> raise and lower it, <b>&minus;</b> <b>=</b> move it in and out, <b>A</b> hands it back to the automatic circle. <b>1</b>&ndash;<b>5</b> pick orbit, playground, entrance, courtyard and overhead.'],
+    'By default the camera circles the building on its own. <b>&larr; &rarr;</b> (or <b>Q</b> <b>E</b>) move it round, <b>&uarr; &darr;</b> raise and lower it, <b>&minus;</b> <b>=</b> move it in and out, <b>A</b> hands it back to the automatic circle. <b>1</b>&ndash;<b>4</b> pick orbit, playground, street level and overhead.'],
   ['Task &mdash; the texture of the building changes',
     '<code>building.js</code> requestSkin, updateFacade, <code>shaders.js</code> makeFacadeMaterial',
-    'Every wall of the campus uses one of three facade shaders (one per window layout); each has two colour schemes bound at once and a glowing, noise-edged front climbs the building from the ground to the roof, swapping one for the other. It happens every 12 s; <b>B</b> changes it now, <b>V</b> turns the timer off and on.'],
+    'Two skins are bound to the facade shader at once and a glowing, noise-edged front climbs the building from the ground to the roof, swapping one for the other. It happens every 12 s; <b>B</b> changes it now, <b>V</b> turns the timer off and on.'],
   ['Task &mdash; the light rotates around the building',
     '<code>animation.js</code> updateOrbitLight, <code>interaction.js</code> pointermove',
     'The scene\'s only light circles the building on its own, so each face comes into the light in turn and the shadows sweep round the site. Nothing marks it in the scene; the sun (or the moon at night) drawn by the sky shader sits in the light\'s direction, so it travels round the sky with it. <b>J</b> holds it or lets it run, <b>Z</b> <b>X</b> step it round by hand, <b>R</b> <b>F</b> raise and lower it, <b>O</b> changes its colour, <b>L</b> turns it off.']
@@ -213,11 +213,8 @@ function hasWebGL() {
 
 async function buildTextures() {
   step(10, 'glazing the ribbon windows'); await nextFrame();
-  TEX.skins = {}; TEX.masks = {};
-  for (const layout of ['ribbon', 'punched', 'gallery']) {
-    TEX.skins[layout] = SKINS.map(s => buildSkin(s, layout));
-    TEX.masks[layout] = texWindowMask(layout);
-  }
+  TEX.skins = SKINS.map(s => s.build());
+  TEX.windowMask = texWindowMask();
   TEX.terracotta = texTerracotta();
   TEX.redPaving = texRedPaving();
 
@@ -256,10 +253,7 @@ async function buildTextures() {
 
   step(80, 'printing the signs'); await nextFrame();
   TEX.door = texDoor();
-  TEX.nameBoard = texNameBoard('আহ্ছানউল্লা ইউনিভার্সিটি অব সায়েন্স অ্যান্ড টেকনোলজি', 'AHSANULLAH UNIVERSITY OF SCIENCE AND TECHNOLOGY');
-  TEX.lettering = texLettering('AUST');
-  TEX.louver = texLouver();
-  TEX.concretePanel = texConcretePanel();
+  TEX.archSign = texArchSign('Ahsanullah University of Science And Technology');
   TEX.playSign = texPlaque('PLAYGROUND');
   TEX.flag = texFlag();
   TEX.glow = texGlow();
@@ -280,7 +274,7 @@ async function boot() {
   placeLight(1);
   buildGround();
 
-  step(90, 'raising the wings round the courtyard'); await nextFrame();
+  step(90, 'raising the towers and the arch'); await nextFrame();
   buildBuilding();
 
   step(94, 'building the playground'); await nextFrame();
@@ -309,7 +303,7 @@ async function boot() {
   UI('loadTxt').innerHTML = '<b>Ready.</b><br>Click the circle or press Enter';
 
   applyPreset(0);
-  orbit.dist = orbit.distGoal = 175;
+  orbit.dist = orbit.distGoal = 105;
   orbit.phi = 1.25;
   clock = new THREE.Clock();
   updateSky();

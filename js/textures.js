@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { TAU, clamp, rng } from './helpers.js';
 
-/* every texture in the scene is painted here with the 2D canvas API at load
-   time, so nothing is downloaded and nothing comes from an outside source */
+
 
 const TEX = {};
 
@@ -12,8 +11,7 @@ function canvas2d(w, h) {
   return [c, c.getContext('2d')];
 }
 
-/* tileable value noise: the lattice wraps round, so every texture built on it
-   repeats without a seam */
+
 function noise2(size, octaves, seed, gain, cells0) {
   const out = new Float32Array(size * size);
   const rand = rng(seed);
@@ -41,7 +39,7 @@ function noise2(size, octaves, seed, gain, cells0) {
   return out;
 }
 
-/* run fn over every pixel; fn writes r, g, b into px */
+
 function paintPixels(g, S, fn) {
   const img = g.createImageData(S, S), d = img.data, px = [0, 0, 0];
   for (let y = 0; y < S; y++) {
@@ -54,7 +52,7 @@ function paintPixels(g, S, fn) {
   g.putImageData(img, 0, 0);
 }
 
-/* darken or lighten what is already on the canvas with a noise field */
+
 function grime(g, S, n, amount) {
   const img = g.getImageData(0, 0, S, S), d = img.data;
   for (let i = 0; i < S * S; i++) {
@@ -74,48 +72,28 @@ function makeTex(c, rx, ry, srgb) {
   return t;
 }
 
-/* ============================================================================
-   BUILDING SKINS
-   The AUST campus uses three kinds of wall, so there are three window
-   layouts:
-     ribbon   continuous glass between projecting floor slabs (the glass block)
-     punched  white render with one square window per bay (the outer walls)
-     gallery  open corridors round the courtyard: a white column at each end
-              of the bay, a solid parapet, and the brick back wall of the
-              corridor with its window
-   Each layout is painted in five colour schemes. One texture tile is one bay
-   of a storey, 3.2 m wide and 3.4 m high. Within a layout every scheme puts
-   the glass in exactly the same place, which is what lets the facade shader
-   wipe from one scheme to the next and lets one mask per layout light the
-   rooms at night whichever scheme is on.
-   ========================================================================== */
+
 const BAY = { w: 3.2, h: 3.4 };
-const LAYOUTS = {
-  ribbon: { x0: 0.035, x1: 0.965, y0: 0.30, y1: 0.88, frame: 0.022, mullion: 0.02, transom: 0.72, split: 2 },
-  punched: { x0: 0.30, x1: 0.70, y0: 0.36, y1: 0.80, frame: 0.03, mullion: 0.025, transom: 0.68, split: 2 },
-  gallery: { x0: 0.50, x1: 0.84, y0: 0.42, y1: 0.86, frame: 0.03, mullion: 0.03, transom: 0.70, split: 1 }
-};
+const WIN = { x0: 0.035, x1: 0.965, y0: 0.30, y1: 0.88, frame: 0.022, mullion: 0.02, transom: 0.72 };
 const SKIN_SIZE = 512;
 
-/* the window as canvas rectangles (canvas y runs down, texture v runs up) */
-function windowRects(S, L) {
-  const ox = L.x0 * S, oy = (1 - L.y1) * S;
-  const ow = (L.x1 - L.x0) * S, oh = (L.y1 - L.y0) * S;
-  const f = L.frame * S, m = L.mullion * S;
+/* the window  */
+function windowRects(S) {
+  const ox = WIN.x0 * S, oy = (1 - WIN.y1) * S;
+  const ow = (WIN.x1 - WIN.x0) * S, oh = (WIN.y1 - WIN.y0) * S;
+  const f = WIN.frame * S, m = WIN.mullion * S;
   const ix = ox + f, iy = oy + f, iw = ow - 2 * f, ih = oh - 2 * f;
-  const yT = (1 - L.transom) * S;                      // the transom bar
-  const panes = [[ix, iy, iw, yT - iy - m / 2]];       // top light above the transom
-  if (L.split === 2) {
-    panes.push([ix, yT + m / 2, iw / 2 - m / 2, iy + ih - yT - m / 2]);
-    panes.push([ix + iw / 2 + m / 2, yT + m / 2, iw / 2 - m / 2, iy + ih - yT - m / 2]);
-  } else {
-    panes.push([ix, yT + m / 2, iw, iy + ih - yT - m / 2]);
-  }
+  const yT = (1 - WIN.transom) * S;                   
+  const panes = [
+    [ix, iy, iw, yT - iy - m / 2],                      
+    [ix, yT + m / 2, iw / 2 - m / 2, iy + ih - yT - m / 2],
+    [ix + iw / 2 + m / 2, yT + m / 2, iw / 2 - m / 2, iy + ih - yT - m / 2]
+  ];
   return { outer: [ox, oy, ow, oh], panes };
 }
 
-function drawWindow(g, S, L, frameCol, glassTop, glassBottom) {
-  const r = windowRects(S, L);
+function drawWindow(g, S, frameCol, glassTop, glassBottom) {
+  const r = windowRects(S);
   g.fillStyle = frameCol;
   g.fillRect(r.outer[0], r.outer[1], r.outer[2], r.outer[3]);
   for (const p of r.panes) {
@@ -126,7 +104,7 @@ function drawWindow(g, S, L, frameCol, glassTop, glassBottom) {
     g.fillRect(p[0], p[1], p[2], p[3]);
     g.save();
     g.beginPath(); g.rect(p[0], p[1], p[2], p[3]); g.clip();
-    g.fillStyle = 'rgba(255,255,255,.08)';               // a soft diagonal reflection
+    g.fillStyle = 'rgba(255,255,255,.08)';
     g.beginPath();
     g.moveTo(p[0] + p[2] * 0.10, p[1] + p[3]);
     g.lineTo(p[0] + p[2] * 0.45, p[1]);
@@ -137,11 +115,11 @@ function drawWindow(g, S, L, frameCol, glassTop, glassBottom) {
   }
 }
 
-/* mask: red = glass, green = frame. Linear data, not a colour */
-function texWindowMask(layout) {
+
+function texWindowMask() {
   const S = SKIN_SIZE, [c, g] = canvas2d(S);
-  const r = windowRects(S, LAYOUTS[layout]);
   g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
+  const r = windowRects(S);
   g.fillStyle = '#00ff00'; g.fillRect(r.outer[0], r.outer[1], r.outer[2], r.outer[3]);
   g.fillStyle = '#ff0000';
   for (const p of r.panes) g.fillRect(p[0], p[1], p[2], p[3]);
@@ -150,50 +128,86 @@ function texWindowMask(layout) {
   return t;
 }
 
-/* --- the five wall finishes, each filling a whole tile --- */
-function wallWhite(g, S) {
+
+function spandrel(g, S, fill) {
+  const top = (1 - WIN.y1) * S, bottom = (1 - WIN.y0) * S;
+  fill(0, 0, S, top);                  
+  fill(0, bottom, S, S - bottom);      
+}
+
+
+function skinWhite() {
+  const S = SKIN_SIZE, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 111, 0.55, 8);
   paintPixels(g, S, (i, x, y, px) => {
     const v = n[i] * 16;
-    px[0] = 229 + v; px[1] = 229 + v; px[2] = 225 + v;
+    px[0] = 228 + v; px[1] = 229 + v; px[2] = 226 + v;
   });
-  g.fillStyle = 'rgba(0,0,0,.05)'; g.fillRect(0, S - 3, S, 3);
+  const bottom = (1 - WIN.y0) * S;
+  g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(0, bottom + S * 0.03, S, 2);   // panel joint
+  g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(0, S - 3, S, 3);
+  drawWindow(g, S, '#e9ecec', '#7fa6ab', '#244a52');
+  return makeTex(c);
 }
-function wallTerracotta(g, S) {
+
+
+function skinTerracotta() {
+  const S = SKIN_SIZE, [c, g] = canvas2d(S);
   g.fillStyle = '#d9cfc4'; g.fillRect(0, 0, S, S);
-  const rand = rng(222), th = S / 18, tw = th * 3;
-  for (let r = 0; r < 18; r++) {
-    const off = (r % 2) * tw / 2;
-    for (let x = -tw; x < S + tw; x += tw) {
-      const t = rand();
-      g.fillStyle = `rgb(${170 + t * 34 | 0},${74 + t * 20 | 0},${44 + t * 14 | 0})`;
-      g.fillRect(x + off + 1.5, r * th + 1.5, tw - 3, th - 3);
+  const rand = rng(222);
+  spandrel(g, S, (x0, y0, w, h) => {
+    const th = S / 18, tw = th * 3;
+    for (let y = y0; y < y0 + h; y += th) {
+      const off = (Math.round(y / th) % 2) * tw / 2;
+      for (let x = -tw; x < S + tw; x += tw) {
+        const t = rand();
+        g.fillStyle = `rgb(${170 + t * 34 | 0},${74 + t * 20 | 0},${44 + t * 14 | 0})`;
+        g.fillRect(x + off + 1.5, y + 1.5, tw - 3, Math.min(th, y0 + h - y) - 3);
+      }
     }
-  }
+  });
   grime(g, S, noise2(S, 5, 223, 0.55, 8), 24);
+  drawWindow(g, S, '#3b3129', '#8c9aa2', '#2a343b');
+  return makeTex(c);
 }
-function wallBlueGlass(g, S) {
+
+
+function skinBlueGlass() {
+  const S = SKIN_SIZE, [c, g] = canvas2d(S);
   const grd = g.createLinearGradient(0, 0, S, S);
   grd.addColorStop(0, '#3d5a78'); grd.addColorStop(1, '#1f3148');
   g.fillStyle = grd; g.fillRect(0, 0, S, S);
+  g.fillStyle = 'rgba(255,255,255,.06)';
+  g.fillRect(0, (1 - WIN.y0) * S + S * 0.06, S, S * 0.08);
   g.fillStyle = '#b8c2cc';
-  g.fillRect(0, 0, S, 5); g.fillRect(0, 0, 5, S);
-  g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(0, S * 0.8, S, S * 0.08);
+  g.fillRect(0, (1 - WIN.y0) * S + 2, S, 5);
+  g.fillRect(0, 0, S, 5);
+  drawWindow(g, S, '#c3cbd3', '#7fa0c2', '#1c3350');
+  return makeTex(c);
 }
-function wallSandstone(g, S) {
+
+
+function skinSandstone() {
+  const S = SKIN_SIZE, [c, g] = canvas2d(S);
   const n = noise2(S, 6, 404, 0.58, 8);
   paintPixels(g, S, (i, x, y, px) => {
     const v = n[i] * 44;
     px[0] = 194 + v; px[1] = 164 + v * 0.9; px[2] = 120 + v * 0.7;
   });
-  g.strokeStyle = 'rgba(92,70,40,.45)'; g.lineWidth = 3;
-  for (let r = 0; r < 4; r++) {
-    const y = r * S / 4;
-    g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke();
-    for (let x = (r % 2) * S / 6; x < S; x += S / 3) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + S / 4); g.stroke(); }
+  g.strokeStyle = 'rgba(92,70,40,.5)'; g.lineWidth = 3;
+  const bottom = (1 - WIN.y0) * S;
+  for (const y of [bottom + (S - bottom) / 2, S - 1]) { g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke(); }
+  for (let x = S / 6; x < S; x += S / 3) {
+    g.beginPath(); g.moveTo(x, bottom); g.lineTo(x, bottom + (S - bottom) / 2); g.stroke();
+    g.beginPath(); g.moveTo(x + S / 6, bottom + (S - bottom) / 2); g.lineTo(x + S / 6, S); g.stroke();
   }
+  drawWindow(g, S, '#5a4630', '#8aa0ad', '#26323b');
+  return makeTex(c);
 }
-function wallGranite(g, S) {
+
+
+function skinGranite() {
+  const S = SKIN_SIZE, [c, g] = canvas2d(S);
   const n = noise2(S, 6, 505, 0.6, 16);
   const rand = rng(506);
   paintPixels(g, S, (i, x, y, px) => {
@@ -201,64 +215,21 @@ function wallGranite(g, S) {
     const v = 58 + n[i] * 30 + speck;
     px[0] = v; px[1] = v; px[2] = v * 1.04;
   });
-}
-
-/* brick for the back wall of the gallery corridors */
-function brickRect(g, x0, y0, w, h, S) {
-  g.fillStyle = '#b3a293'; g.fillRect(x0, y0, w, h);
-  const rand = rng(77), bh = S / 26, bw = bh * 2.3;
-  g.save(); g.beginPath(); g.rect(x0, y0, w, h); g.clip();
-  for (let r = 0; r * bh < h + bh; r++) {
-    const off = (r % 2) * bw / 2;
-    for (let x = x0 - bw; x < x0 + w + bw; x += bw) {
-      const t = rand();
-      g.fillStyle = `rgb(${138 + t * 36 | 0},${56 + t * 18 | 0},${40 + t * 12 | 0})`;
-      g.fillRect(x + off + 1.5, y0 + r * bh + 1.5, bw - 3, bh - 3);
-    }
-  }
-  g.restore();
+  g.fillStyle = 'rgba(255,255,255,.12)';
+  g.fillRect(0, (1 - WIN.y0) * S + 3, S, 2);
+  drawWindow(g, S, '#161616', '#b39b78', '#3a2f24');
+  return makeTex(c);
 }
 
 const SKINS = [
-  { name: 'Campus white', wall: wallWhite, frame: '#e3e6e6', glass: ['#8fb0b5', '#2a4a52'], back: 'brick', trim: 0xf2f2ee },
-  { name: 'Terracotta', wall: wallTerracotta, frame: '#3b3129', glass: ['#8c9aa2', '#2a343b'], back: '#e6dccb', trim: 0xe9e2d6 },
-  { name: 'Blue glass', wall: wallBlueGlass, frame: '#c3cbd3', glass: ['#7fa0c2', '#1c3350'], back: '#22354d', trim: 0xc9d1d8 },
-  { name: 'Sandstone', wall: wallSandstone, frame: '#5a4630', glass: ['#8aa0ad', '#26323b'], back: '#8a6a48', trim: 0xe8dcc4 },
-  { name: 'Charcoal granite', wall: wallGranite, frame: '#161616', glass: ['#b39b78', '#3a2f24'], back: '#c7b08a', trim: 0x8d8f93 }
+  { name: 'Campus white', build: skinWhite, trim: 0xf2f2ee },
+  { name: 'Terracotta', build: skinTerracotta, trim: 0xe9e2d6 },
+  { name: 'Blue glass', build: skinBlueGlass, trim: 0xc9d1d8 },
+  { name: 'Sandstone', build: skinSandstone, trim: 0xe8dcc4 },
+  { name: 'Charcoal granite', build: skinGranite, trim: 0x8d8f93 }
 ];
 
-/* one tile: a scheme painted in a layout */
-function buildSkin(skin, layout) {
-  const S = SKIN_SIZE, [c, g] = canvas2d(S);
-  const L = LAYOUTS[layout];
-  skin.wall(g, S);
 
-  if (layout === 'ribbon') {
-    g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(0, (1 - L.y0) * S + S * 0.03, S, 2);
-  } else if (layout === 'punched') {
-    const r = windowRects(S, L).outer;
-    g.fillStyle = 'rgba(0,0,0,.14)'; g.fillRect(r[0] - 4, r[1] - 4, r[2] + 8, r[3] + 8);   // reveal
-    g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(r[0] - S * 0.02, r[1] + r[3], r[2] + S * 0.04, S * 0.025);  // sill
-  } else {
-    /* the corridor: its back wall shows between the columns, above the parapet */
-    const x0 = S * 0.075, x1 = S * 0.925, top = 0, bottom = (1 - 0.36) * S;
-    if (skin.back === 'brick') brickRect(g, x0, top, x1 - x0, bottom - top, S);
-    else { g.fillStyle = skin.back; g.fillRect(x0, top, x1 - x0, bottom - top); }
-    const shade = g.createLinearGradient(0, top, 0, bottom);         // shadow under the slab above
-    shade.addColorStop(0, 'rgba(0,0,0,.45)'); shade.addColorStop(0.35, 'rgba(0,0,0,.12)'); shade.addColorStop(1, 'rgba(0,0,0,.05)');
-    g.fillStyle = shade; g.fillRect(x0, top, x1 - x0, bottom - top);
-    /* a door on the back wall beside the window */
-    g.fillStyle = 'rgba(40,30,25,.85)'; g.fillRect(S * 0.16, (1 - 0.82) * S, S * 0.22, 0.46 * S);
-    /* parapet top and the edge of the floor slab */
-    g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x0, bottom, x1 - x0, 4);
-    g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(0, bottom + 4, S, 3);
-    g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(0, S - S * 0.1, S, 2);
-    g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(x0 - 3, 0, 3, bottom); g.fillRect(x1, 0, 3, bottom);
-  }
-  drawWindow(g, S, L, skin.frame, skin.glass[0], skin.glass[1]);
-  return makeTex(c);
-}
-/* --- the solid terracotta panels of the red tower --- */
 function texTerracotta() {
   const S = 512, [c, g] = canvas2d(S);
   g.fillStyle = '#cdbfb0'; g.fillRect(0, 0, S, S);
@@ -276,7 +247,7 @@ function texTerracotta() {
   return makeTex(c);
 }
 
-/* --- red brick paving of the forecourt, in herringbone --- */
+
 function texRedPaving() {
   const S = 512, [c, g] = canvas2d(S);
   g.fillStyle = '#8f7f72'; g.fillRect(0, 0, S, S);
@@ -292,67 +263,22 @@ function texRedPaving() {
   return makeTex(c);
 }
 
-/* --- the name board over the stairs: Bengali above English, white on navy --- */
-function texNameBoard(bn, en) {
-  const W = 2048, H = 300, [c, g] = canvas2d(W, H);
-  g.fillStyle = '#1d3763'; g.fillRect(0, 0, W, H);
-  g.strokeStyle = '#e9eef5'; g.lineWidth = 8; g.strokeRect(10, 10, W - 20, H - 20);
-  g.fillStyle = '#ffffff';
+
+function texArchSign(text) {
+  const [c, g] = canvas2d(2048, 160);
+  g.fillStyle = '#f7f7f2'; g.fillRect(0, 0, 2048, 160);
+  g.fillStyle = '#1f7a45'; g.fillRect(0, 0, 2048, 10); g.fillRect(0, 150, 2048, 10);
+  g.fillStyle = '#1f7a45';
+  g.font = 'bold 92px Georgia, "Times New Roman", serif';
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = 'bold 104px "Nirmala UI", "Noto Sans Bengali", "Vrinda", "Shonar Bangla", sans-serif';
-  g.fillText(bn, W / 2, 95, W - 120);
-  g.font = 'bold 96px "Segoe UI", Arial, Helvetica, sans-serif';
-  g.fillText(en, W / 2, 215, W - 120);
+  g.fillText(text, 1024, 84, 1960);
   return makeTex(c);
 }
+//end b
 
-/* --- building lettering on the tower, white on transparent --- */
-function texLettering(text) {
-  const [c, g] = canvas2d(512, 160);
-  g.clearRect(0, 0, 512, 160);
-  g.fillStyle = '#ffffff';
-  g.font = 'bold 118px "Segoe UI", Arial, Helvetica, sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(text, 256, 86);
-  const t = makeTex(c);
-  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-  return t;
-}
+//s p g 
 
-/* --- horizontal aluminium louvres over the top floor window band --- */
-function texLouver() {
-  const [c, g] = canvas2d(512, 128);
-  g.fillStyle = '#6f7a80'; g.fillRect(0, 0, 512, 128);
-  for (let y = 0; y < 128; y += 10) {
-    const grd = g.createLinearGradient(0, y, 0, y + 10);
-    grd.addColorStop(0, '#d8dde0'); grd.addColorStop(0.6, '#a9b1b6'); grd.addColorStop(1, '#5c666c');
-    g.fillStyle = grd; g.fillRect(0, y, 512, 8);
-  }
-  g.fillStyle = '#e8ebec';
-  for (let x = 0; x < 512; x += 64) g.fillRect(x, 0, 5, 128);        // mullions
-  return makeTex(c);
-}
 
-/* --- precast concrete panels of the boundary wall --- */
-function texConcretePanel() {
-  const S = 256, [c, g] = canvas2d(S);
-  const n = noise2(S, 5, 1250, 0.55, 4);
-  paintPixels(g, S, (i, x, y, px) => {
-    const v = 150 + n[i] * 36;
-    px[0] = v; px[1] = v * 0.99; px[2] = v * 0.96;
-  });
-  g.fillStyle = 'rgba(0,0,0,.35)';
-  g.fillRect(0, 0, S, 3); g.fillRect(0, 0, 3, S);              // panel joints
-  const rand = rng(1251);
-  for (let k = 0; k < 40; k++) { g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(rand() * S, rand() * S, 2, 2); }
-  return makeTex(c);
-}
-
-/* ============================================================================
-   GROUND, PAVING AND PLAYGROUND SURFACES
-   ========================================================================== */
-
-/* --- square concrete pavers, each one a slightly different shade --- */
 function texPaving() {
   const S = 512, [c, g] = canvas2d(S);
   const rand = rng(606), cells = 8, cs = S / cells;
@@ -367,7 +293,7 @@ function texPaving() {
   return makeTex(c);
 }
 
-/* --- lawn --- */
+
 function texGrass() {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 700, 0.55, 4), m = noise2(S, 3, 701, 0.5, 2);
@@ -392,7 +318,7 @@ function texGrass() {
   return makeTex(c);
 }
 
-/* --- bare soil, worn into the lawn by the shader --- */
+
 function texDirt() {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 800, 0.55, 4);
@@ -403,7 +329,7 @@ function texDirt() {
   return makeTex(c);
 }
 
-/* --- sand for the sandpit --- */
+
 function texSand() {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 900, 0.6, 8);
@@ -415,7 +341,7 @@ function texSand() {
   return makeTex(c);
 }
 
-/* --- poured rubber safety surface: coloured granules on a base colour --- */
+
 function texRubber() {
   const S = 256, [c, g] = canvas2d(S);
   g.fillStyle = '#808080'; g.fillRect(0, 0, S, S);
@@ -425,13 +351,13 @@ function texRubber() {
     g.fillStyle = `rgb(${v | 0},${v | 0},${v | 0})`;
     g.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1 + rand() * 2);
   }
-  /* the shader tints this grey, so every zone of the playground can share it */
+  
   const t = makeTex(c);
   t.colorSpace = THREE.NoColorSpace;
   return t;
 }
 
-/* --- flat roof membrane with gravel ballast --- */
+
 function texRoof() {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 1100, 0.6, 8);
@@ -443,7 +369,7 @@ function texRoof() {
   return makeTex(c);
 }
 
-/* --- concrete for the canopy, plinth, stair house and step --- */
+
 function texConcrete(base) {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 1200 + base, 0.55, 4);
@@ -452,14 +378,14 @@ function texConcrete(base) {
     px[0] = v; px[1] = v * 0.99; px[2] = v * 0.96;
   });
   const rand = rng(1201);
-  for (let k = 0; k < 60; k++) {                  // little air holes
+  for (let k = 0; k < 60; k++) {                 
     g.fillStyle = 'rgba(0,0,0,.25)';
     g.beginPath(); g.arc(rand() * S, rand() * S, 0.6 + rand(), 0, TAU); g.fill();
   }
   return makeTex(c);
 }
 
-/* --- timber planks for benches, the sandpit and the see-saw --- */
+
 function texWood(r, gr, b) {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 4, 1300 + r, 0.5, 4);
@@ -469,11 +395,11 @@ function texWood(r, gr, b) {
     px[0] = r * v; px[1] = gr * v; px[2] = b * v;
   });
   g.fillStyle = 'rgba(40,20,5,.35)';
-  for (let y = 0; y < S; y += S / 4) g.fillRect(0, y, S, 2);    // plank joints
+  for (let y = 0; y < S; y += S / 4) g.fillRect(0, y, S, 2);    
   return makeTex(c);
 }
 
-/* --- powder coated steel for the play equipment --- */
+
 function texPaint(hex) {
   const S = 128, [c, g] = canvas2d(S);
   g.fillStyle = hex; g.fillRect(0, 0, S, S);
@@ -488,7 +414,7 @@ function texPaint(hex) {
   return makeTex(c);
 }
 
-/* --- galvanised steel for chains, posts and the roof plant --- */
+
 function texMetal(base) {
   const S = 256, [c, g] = canvas2d(S);
   g.fillStyle = base; g.fillRect(0, 0, S, S);
@@ -503,7 +429,7 @@ function texMetal(base) {
   return makeTex(c);
 }
 
-/* --- louvred grille on the rooftop air handlers --- */
+
 function texVent() {
   const S = 128, [c, g] = canvas2d(S);
   g.fillStyle = '#a9afb4'; g.fillRect(0, 0, S, S);
@@ -513,7 +439,7 @@ function texVent() {
   return makeTex(c);
 }
 
-/* --- photovoltaic panel: blue cells in an aluminium frame --- */
+
 function texSolar() {
   const S = 256, [c, g] = canvas2d(S);
   g.fillStyle = '#c9ced3'; g.fillRect(0, 0, S, S);
@@ -530,7 +456,7 @@ function texSolar() {
   return makeTex(c);
 }
 
-/* --- bark and leaves --- */
+
 function texBark() {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 1600, 0.6, 4);
@@ -553,7 +479,7 @@ function texLeaf() {
   return makeTex(c);
 }
 
-/* --- glass entrance doors in a steel frame --- */
+
 function texDoor() {
   const [c, g] = canvas2d(256, 256);
   g.fillStyle = '#3b3f45'; g.fillRect(0, 0, 256, 256);
@@ -564,14 +490,14 @@ function texDoor() {
   };
   pane(14, 14, 110, 228); pane(132, 14, 110, 228);
   g.fillStyle = '#c9ced3';
-  g.fillRect(108, 110, 8, 60); g.fillRect(140, 110, 8, 60);    // pull handles
+  g.fillRect(108, 110, 8, 60); g.fillRect(140, 110, 8, 60);    
   g.fillStyle = 'rgba(255,255,255,.75)';
   g.font = 'bold 12px ui-sans-serif, sans-serif'; g.textAlign = 'center';
   g.fillText('PUSH', 69, 100); g.fillText('PUSH', 187, 100);
   return makeTex(c);
 }
 
-/* --- building name board over the canopy --- */
+
 function texPlaque(text) {
   const [c, g] = canvas2d(1024, 96);
   g.fillStyle = '#20252c'; g.fillRect(0, 0, 1024, 96);
@@ -583,8 +509,7 @@ function texPlaque(text) {
   return makeTex(c);
 }
 
-/* --- the national flag of Bangladesh: a red disc on bottle green, 10 : 6,
-   the disc a fifth of the length across and set a little toward the hoist --- */
+
 function texFlag() {
   const W = 500, H = 300, [c, g] = canvas2d(W, H);
   g.fillStyle = '#006a4e'; g.fillRect(0, 0, W, H);
@@ -595,7 +520,7 @@ function texFlag() {
   return t;
 }
 
-/* --- merry-go-round deck: six coloured segments --- */
+
 function texCarousel() {
   const S = 512, [c, g] = canvas2d(S);
   const cols = ['#e2553d', '#f2b441', '#3f9fd6', '#6cbf5a', '#9a6bd0', '#f07aa6'];
@@ -611,7 +536,7 @@ function texCarousel() {
   return makeTex(c);
 }
 
-/* --- a radial falloff for every glow sprite --- */
+
 function texGlow() {
   const S = 128, [c, g] = canvas2d(S);
   const grd = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
@@ -625,7 +550,7 @@ function texGlow() {
   return t;
 }
 
-/* --- a single grass tuft cut out with alpha --- */
+
 function texTuft() {
   const S = 128, [c, g] = canvas2d(S);
   const rand = rng(1900);
@@ -642,44 +567,11 @@ function texTuft() {
 }
 
 export {
-  BAY, LAYOUTS, SKINS, TEX, buildSkin, canvas2d, makeTex, texConcretePanel, texLettering, texLouver, texNameBoard, texRedPaving, texTerracotta,
+  BAY, SKINS, TEX, WIN, canvas2d, makeTex, texArchSign, texRedPaving, texTerracotta,
   texBark, texCarousel, texConcrete, texDirt, texDoor, texFlag, texGlow, texGrass, texLeaf,
   texMetal, texPaint, texPaving, texPlaque, texRoof, texRubber, texSand, texSolar, texTuft, texVent,
   texWindowMask, texWood
 };
 
 
-/*
 
-├── noise2()            tileable value noise, the base of most textures
-├── windowRects()       where the glass sits in a layout
-├── LAYOUTS             ribbon, punched and gallery window layouts
-├── wallWhite() … wallGranite()   the five wall finishes (skins)
-├── buildSkin()         one finish painted in one layout
-├── texWindowMask()     glass / frame mask for one layout
-├── texTerracotta()     the red tower
-├── texRedPaving()      forecourt and courtyard
-├── texNameBoard()      the Bengali and English name board over the stairs
-├── texLettering()      AUST on the tower
-├── texLouver()         louvres on the white block's top floor
-├── texConcretePanel()  boundary wall
-├── texPaving()         plaza and path
-├── texGrass()          lawn
-├── texDirt()           worn lawn
-├── texSand()           sandpit
-├── texRubber()         playground safety surface
-├── texRoof()           roof membrane
-├── texConcrete()       canopy, plinth, stair house
-├── texWood()           benches, sandpit, see-saw
-├── texPaint()          play equipment
-├── texMetal()          chains, posts, roof plant
-├── texVent()           air handler grille
-├── texBark(), texLeaf()   trees
-├── texDoor()           entrance doors
-├── texPlaque()         playground gate sign
-├── texFlag()           the flag of Bangladesh
-├── texCarousel()       merry-go-round deck
-├── texGlow()           light glow sprite
-└── texTuft()           grass sprite
-
-*/

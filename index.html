@@ -45,9 +45,7 @@ button{font:inherit;color:inherit}
   background:radial-gradient(120% 90% at 50% 45%,transparent 55%,rgba(5,8,12,.55) 100%);
 }
 
-/* ============================================================================
-   START SCREEN — a blueprint drawing sheet laid over the live scene
-   ========================================================================== */
+/*a blueprint drawing sheet laid over the live scene*/
 #start{
   --ink-blue:#0d3a7a;
   --line:rgba(206,226,255,.55);
@@ -104,7 +102,7 @@ button{font:inherit;color:inherit}
 
 .sub{margin:0 0 26px;font-size:clamp(14px,1.4vw,17px);line-height:1.6;color:rgba(234,242,255,.8);max-width:52ch}
 
-/* round enter button; its ring fills as the scene loads (--p from 0 to 100) */
+/* r_enter button and progression */
 .go{display:flex;align-items:center;gap:22px}
 #enter{
   --p:0;position:relative;width:118px;height:118px;border-radius:50%;border:none;cursor:pointer;
@@ -135,9 +133,7 @@ kbd{
   font-family:var(--mono);font-size:10.5px;line-height:1.35;color:var(--fog);
   background:rgba(214,220,228,.09);border:1px solid var(--rule);border-radius:3px;
 }
-/* ============================================================================
-   HUD
-   ========================================================================== */
+/*HUB*/
 #hud{position:fixed;inset:0;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s ease .25s}
 #hud.on{opacity:1}
 #hud.off{opacity:0!important}
@@ -176,9 +172,7 @@ kbd{
 #toast.show{opacity:1}
 #toast b{color:var(--clay);font-weight:600}
 
-/* ============================================================================
-   BUILD NOTES
-   ========================================================================== */
+
 #info{
   position:fixed;inset:0;z-index:35;display:flex;justify-content:center;align-items:center;
   background:rgba(6,9,14,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
@@ -201,7 +195,7 @@ kbd{
 #fatal h2{margin:0 0 12px;color:var(--clay);font-size:22px;font-weight:700}
 #fatal p{margin:0;color:var(--fog-2);line-height:1.65;font-size:14px}
 
-/* ---------- touch pad ---------- */
+/*  touch pad  */
 #touch{position:fixed;inset:auto 0 0 0;z-index:25;display:flex;gap:7px;padding:0 12px var(--pad);justify-content:center}
 .tb{width:50px;height:50px;border-radius:50%;background:rgba(16,20,27,.72);border:1px solid var(--rule);
   backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;
@@ -229,7 +223,7 @@ kbd{
 <div id="viewport"></div>
 <div id="vignette"></div>
 
-<!-- ========================= START SCREEN ========================= -->
+<!--  START SCREEN -->
 <div id="start">
   <div class="sheet">
     <i class="mark tl"></i><i class="mark tr"></i><i class="mark bl"></i><i class="mark br"></i>
@@ -242,11 +236,11 @@ kbd{
     <div class="hero">
       <p class="kicker">Campus study, drawn in WebGL</p>
       <h1>A Building<br><span class="outline">&amp; a Playground</span></h1>
-      <div class="dim" aria-hidden="true"><i></i><span>66.0 m frontage</span></div>
+      <div class="dim" aria-hidden="true"><i></i><span>46.0 m frontage</span></div>
       <p class="sub">
-        The AUST campus &mdash; the terracotta tower, the stairs under the pergola and
-        eight storeys of white wings round a courtyard &mdash; with a playground in front.
-        Its walls change texture, a single light circles it and the camera never stops moving.
+        The AUST main entrance &mdash; terracotta tower, curved white wings and the
+        ribbed arch over the grand stairs &mdash; with a playground next door. Its facade
+        changes texture, a lantern circles it and the camera never stops moving.
       </p>
       <div class="go">
         <button id="enter" disabled><span id="enterTxt">loading</span></button>
@@ -261,12 +255,12 @@ kbd{
     </div>
   </div>
 </div>
-<!-- ========================= HUD ========================= -->
+
 <div id="hud">
   <div id="tele" class="panel">
     <div class="row"><span class="lbl">Camera</span><span class="val hot" id="tCam">Orbit</span></div>
     <div class="row"><span class="lbl">Camera angle</span><span class="val" id="tAngle">0&deg;</span></div>
-    <div class="row"><span class="lbl">Projection</span><span class="val hot" id="tProj">Perspective 50&deg;</span></div>
+    <!-- <div class="row"><span class="lbl">Projection</span><span class="val hot" id="tProj">Perspective 50&deg;</span></div> -->
     <div class="row"><span class="lbl">Light angle</span><span class="val" id="tLight">0&deg;</span></div>
     <div class="row"><span class="lbl">Light elevation</span><span class="val" id="tLightH">41&deg;</span></div>
     <div class="row"><span class="lbl">Sun</span><span class="val" id="tSun">14:00</span></div>
@@ -284,7 +278,7 @@ kbd{
   <div id="hints" class="panel">
     <b>←</b><b>→</b> camera round the building &nbsp; <b>↑</b><b>↓</b> up and down &nbsp; <b>−</b><b>=</b> out and in &nbsp; <b>A</b> auto camera<br>
     <b>Z</b><b>X</b> step the light &nbsp; <b>J</b> light auto &nbsp; <b>B</b> next texture &nbsp; <b>V</b> texture timer &nbsp;
-    <b>1</b>–<b>5</b> cameras &nbsp; <b>N</b> night &nbsp; <b>P</b> projection &nbsp; <b>I</b> notes
+    <b>1</b>–<b>4</b> cameras &nbsp; <b>N</b> night &nbsp;  <b>I</b> notes
   </div>
 
   <div id="toast" class="panel"></div>
@@ -299,7 +293,7 @@ kbd{
   <div class="tb" id="tbNight">NIGHT</div>
 </div>
 
-<!-- ========================= BUILD NOTES ========================= -->
+<!-- BUILD NOTES-->
 <div id="info">
   <div class="doc">
     <h2>How this scene is built</h2>
