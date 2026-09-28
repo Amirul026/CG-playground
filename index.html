@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>A Building and a Playground - CSE4204 Computer Graphics Lab</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏢</text></svg>">
+<meta name="description" content="Real-time 3D scene built with Three.js: a textured building whose facade changes, a playground, a light that orbits the building, hand-written GLSL shaders, perspective projection, animation, mouse and keyboard interaction." />
+<style>
+
+:root{
+  --ink:#10141B;
+  --ink-2:#171D27;
+  --rule:rgba(214,220,228,.14);
+  --rule-soft:rgba(214,220,228,.07);
+  --fog:#D6DCE4;
+  --fog-2:rgba(214,220,228,.64);
+  --fog-3:rgba(214,220,228,.40);
+  --clay:#E58A5C;
+  --clay-dim:rgba(229,138,92,.16);
+  --leaf:#7DBF8E;
+
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+
+  --pad:clamp(18px,3.2vw,44px);
+}
+
+*{box-sizing:border-box}
+html,body{
+  margin:0;padding:0;height:100%;overflow:hidden;background:#06090E;
+  color:var(--fog);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+canvas{display:block}
+.hidden{display:none!important}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--clay);outline-offset:3px;border-radius:2px}
+
+/* ---------- viewport + vignette ---------- */
+#viewport{position:fixed;inset:0;z-index:1}
+#vignette{
+  position:fixed;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 45%,transparent 55%,rgba(5,8,12,.55) 100%);
+}
+
+/* ============================================================================
+   START SCREEN — a blueprint drawing sheet laid over the live scene
+   ========================================================================== */
+#start{
+  --ink-blue:#0d3a7a;
+  --line:rgba(206,226,255,.55);
+  --line-soft:rgba(206,226,255,.13);
+  position:fixed;inset:0;z-index:40;overflow-y:auto;
+  color:#eaf2ff;
+  background:
+    repeating-linear-gradient(0deg,var(--line-soft) 0 1px,transparent 1px 24px),
+    repeating-linear-gradient(90deg,var(--line-soft) 0 1px,transparent 1px 24px),
+    repeating-linear-gradient(0deg,rgba(206,226,255,.22) 0 1px,transparent 1px 120px),
+    repeating-linear-gradient(90deg,rgba(206,226,255,.22) 0 1px,transparent 1px 120px),
+    linear-gradient(160deg,rgba(13,58,122,.74),rgba(8,34,78,.88));
+  transition:opacity .8s ease,visibility .8s,transform .8s ease;
+}
+#start.away{opacity:0;visibility:hidden;pointer-events:none;transform:scale(1.04)}
+
+/* the sheet border with registration marks in the corners */
+#start .sheet{
+  position:relative;min-height:100%;margin:0;padding:clamp(26px,3.6vw,46px);
+  display:flex;flex-direction:column;
+}
+#start .sheet::before{
+  content:"";position:absolute;inset:clamp(10px,1.6vw,20px);
+  border:1px solid var(--line);pointer-events:none;
+}
+.mark{position:absolute;width:18px;height:18px;border-color:#fff;border-style:solid;opacity:.9}
+.mark.tl{top:clamp(10px,1.6vw,20px);left:clamp(10px,1.6vw,20px);border-width:2px 0 0 2px}
+.mark.tr{top:clamp(10px,1.6vw,20px);right:clamp(10px,1.6vw,20px);border-width:2px 2px 0 0}
+.mark.bl{bottom:clamp(10px,1.6vw,20px);left:clamp(10px,1.6vw,20px);border-width:0 0 2px 2px}
+.mark.br{bottom:clamp(10px,1.6vw,20px);right:clamp(10px,1.6vw,20px);border-width:0 2px 2px 0}
+
+.topline{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:rgba(234,242,255,.72)}
+
+.hero{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+  padding:clamp(14px,3vh,40px) 0;max-width:980px}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 18px;color:#9cc3ff}
+.kicker::before{content:"";display:inline-block;width:28px;height:1px;background:#9cc3ff;vertical-align:middle;margin-right:12px}
+
+#start h1{margin:0;font-weight:800;letter-spacing:-.04em;line-height:.9;
+  font-size:clamp(42px,min(7.4vw,12vh),108px);color:#fff}
+#start h1 .outline{color:transparent;-webkit-text-stroke:1.5px #fff;font-style:italic;font-weight:700}
+
+/* a dimension line that draws itself under the title */
+.dim{position:relative;height:26px;margin:18px 0 22px;width:min(640px,86vw)}
+.dim i{position:absolute;left:0;top:12px;height:1px;background:#fff;width:0;animation:draw 1.6s cubic-bezier(.6,0,.2,1) .3s forwards}
+.dim::before,.dim::after{content:"";position:absolute;top:4px;width:1px;height:17px;background:#fff}
+.dim::before{left:0}
+.dim::after{right:0;opacity:0;animation:fadein .3s ease 1.8s forwards}
+.dim span{position:absolute;left:50%;top:-2px;transform:translateX(-50%);padding:0 10px;
+  font-family:var(--mono);font-size:11px;background:#0e3c7c;opacity:0;animation:fadein .4s ease 1.2s forwards}
+@keyframes draw{to{width:100%}}
+@keyframes fadein{to{opacity:1}}
+
+.sub{margin:0 0 26px;font-size:clamp(14px,1.4vw,17px);line-height:1.6;color:rgba(234,242,255,.8);max-width:52ch}
+
+/* round enter button; its ring fills as the scene loads (--p from 0 to 100) */
+.go{display:flex;align-items:center;gap:22px}
+#enter{
+  --p:0;position:relative;width:118px;height:118px;border-radius:50%;border:none;cursor:pointer;
+  background:conic-gradient(#fff calc(var(--p) * 1%),rgba(255,255,255,.18) 0);
+  display:grid;place-items:center;padding:0;transition:transform .25s;
+}
+#enter::before{content:"";position:absolute;inset:3px;border-radius:50%;background:#0e3c7c;transition:background .25s}
+#enter span{position:relative;font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#fff;text-align:center;line-height:1.5}
+#enter:not(:disabled):hover{transform:scale(1.06)}
+#enter:not(:disabled):hover::before{background:#fff}
+#enter:not(:disabled):hover span{color:#0e3c7c}
+#enter:disabled{cursor:progress}
+#enter:not(:disabled){animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.35)}50%{box-shadow:0 0 0 14px rgba(255,255,255,0)}}
+#loadTxt{font-family:var(--mono);font-size:12px;color:rgba(234,242,255,.75);line-height:1.6}
+#loadTxt b{color:#fff;font-weight:600}
+
+/* the title block in the corner of every drawing */
+.titleblock{position:absolute;right:clamp(26px,3.6vw,46px);bottom:clamp(26px,3.6vw,46px);display:grid;grid-template-columns:auto auto;border:1px solid var(--line);
+  font-size:12.5px;min-width:min(460px,100%);background:rgba(8,34,78,.45)}
+.titleblock div{padding:8px 14px;border-bottom:1px solid var(--line-soft)}
+.titleblock div:nth-child(odd){font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#9cc3ff;border-right:1px solid var(--line-soft)}
+.titleblock div:nth-last-child(-n+2){border-bottom:none}
+.titleblock b{font-weight:600;color:#fff}
+
+kbd{
+  display:inline-block;min-width:20px;padding:2px 6px;text-align:center;
+  font-family:var(--mono);font-size:10.5px;line-height:1.35;color:var(--fog);
+  background:rgba(214,220,228,.09);border:1px solid var(--rule);border-radius:3px;
+}
+/* ============================================================================
+   HUD
+   ========================================================================== */
+#hud{position:fixed;inset:0;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s ease .25s}
+#hud.on{opacity:1}
+#hud.off{opacity:0!important}
+
+.panel{
+  position:absolute;background:rgba(16,20,27,.66);border:1px solid var(--rule);
+  backdrop-filter:blur(14px) saturate(1.1);-webkit-backdrop-filter:blur(14px) saturate(1.1);
+}
+
+#tele{top:var(--pad);left:var(--pad);padding:13px 16px;min-width:230px}
+#tele .row{display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11.5px;padding:3.5px 0}
+#tele .row+.row{border-top:1px solid var(--rule-soft)}
+#tele .lbl{color:var(--fog-3)}
+#tele .val{font-family:var(--mono);font-size:11.5px;color:var(--fog);font-variant-numeric:tabular-nums}
+#tele .val.hot{color:var(--clay)}
+
+/* facade card, bottom right */
+#facade{right:var(--pad);bottom:var(--pad);padding:14px 18px 12px;min-width:220px}
+#facade .cap{font-size:10.5px;color:var(--fog-3);margin-bottom:6px}
+#facade .name{font-size:22px;line-height:1.05;font-weight:700;color:#fff;letter-spacing:-.02em}
+#facade .swatches{display:flex;gap:5px;margin-top:10px}
+#facade .swatches i{display:block;width:22px;height:6px;background:var(--rule);transition:background .3s}
+#facade .swatches i.on{background:var(--clay)}
+#facade .meter{height:2px;background:var(--rule-soft);margin-top:10px;overflow:hidden}
+#facade .meter i{display:block;height:100%;width:0%;background:var(--leaf)}
+#facade .sub{font-family:var(--mono);font-size:10.5px;color:var(--fog-3);margin-top:6px}
+
+#hints{left:var(--pad);bottom:var(--pad);padding:10px 14px;font-size:11.5px;color:var(--fog-2);max-width:min(58vw,640px);line-height:1.9}
+#hints b{color:var(--fog);font-family:var(--mono);font-weight:500;font-size:10.5px;
+  background:rgba(214,220,228,.09);border:1px solid var(--rule);border-radius:3px;padding:1px 5px}
+
+#toast{
+  left:50%;top:calc(var(--pad) + 4px);transform:translateX(-50%);
+  padding:9px 20px;font-size:12.5px;color:var(--fog);white-space:nowrap;opacity:0;transition:opacity .28s ease;
+}
+#toast.show{opacity:1}
+#toast b{color:var(--clay);font-weight:600}
+
+/* ============================================================================
+   BUILD NOTES
+   ========================================================================== */
+#info{
+  position:fixed;inset:0;z-index:35;display:flex;justify-content:center;align-items:center;
+  background:rgba(6,9,14,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  padding:var(--pad);overflow-y:auto;opacity:0;visibility:hidden;transition:opacity .3s,visibility .3s;
+}
+#info.on{opacity:1;visibility:visible}
+#info .doc{width:min(1000px,100%);background:var(--ink);border:1px solid var(--rule);padding:clamp(26px,3.4vw,44px);max-height:100%;overflow-y:auto}
+#info h2{margin:0 0 6px;font-size:26px;letter-spacing:-.028em;font-weight:700;color:#fff}
+#info .note{margin:0 0 26px;font-size:13.5px;color:var(--fog-2);line-height:1.6;max-width:72ch}
+#info table{width:100%;border-collapse:collapse;font-size:13px}
+#info th{text-align:left;font-weight:600;color:var(--fog-3);font-size:11.5px;padding:0 14px 9px 0;border-bottom:1px solid var(--rule)}
+#info td{padding:11px 14px 11px 0;border-bottom:1px solid var(--rule-soft);vertical-align:top;line-height:1.55;color:var(--fog-2)}
+#info td:first-child{color:#fff;font-weight:600}
+#info td b{color:var(--clay);font-weight:600}
+#info .close{margin-top:26px;padding:11px 24px;background:transparent;border:1px solid var(--rule);color:var(--fog);cursor:pointer;font-size:13px;transition:border-color .2s,color .2s}
+#info .close:hover{border-color:var(--clay);color:var(--clay)}
+
+#fatal{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:40px;background:#06090E;text-align:center}
+#fatal div{max-width:46ch}
+#fatal h2{margin:0 0 12px;color:var(--clay);font-size:22px;font-weight:700}
+#fatal p{margin:0;color:var(--fog-2);line-height:1.65;font-size:14px}
+
+/* ---------- touch pad ---------- */
+#touch{position:fixed;inset:auto 0 0 0;z-index:25;display:flex;gap:7px;padding:0 12px var(--pad);justify-content:center}
+.tb{width:50px;height:50px;border-radius:50%;background:rgba(16,20,27,.72);border:1px solid var(--rule);
+  backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;
+  color:var(--fog);user-select:none;-webkit-user-select:none;touch-action:none}
+.tb:active{background:var(--clay);color:var(--ink)}
+
+@media (max-width:900px){
+  .titleblock{position:static;align-self:stretch;margin-top:10px}
+  #hints{display:none}
+  #tele{min-width:0}
+  #facade{bottom:calc(var(--pad) + 66px)}
+}
+@media (max-width:560px){
+  #facade .name{font-size:18px}
+  #tele .row:nth-child(n+6){display:none}
+  .tb{width:44px;height:44px;font-size:9.5px}
+  #touch{gap:5px}
+}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+</head>
+
+<body>
+
+<div id="viewport"></div>
+<div id="vignette"></div>
+
+<!-- ========================= START SCREEN ========================= -->
+<div id="start">
+  <div class="sheet">
+    <i class="mark tl"></i><i class="mark tr"></i><i class="mark bl"></i><i class="mark br"></i>
+
+    <div class="topline">
+      <span>CSE4204 &middot; Computer Graphics Lab</span>
+      <span>Sheet 01 / 01 &middot; Tejgaon, Dhaka</span>
+    </div>
+
+    <div class="hero">
+      <p class="kicker">Campus study, drawn in WebGL</p>
+      <h1>A Building<br><span class="outline">&amp; a Playground</span></h1>
+      <div class="dim" aria-hidden="true"><i></i><span>66.0 m frontage</span></div>
+      <p class="sub">
+        The AUST campus &mdash; the terracotta tower, the stairs under the pergola and
+        eight storeys of white wings round a courtyard &mdash; with a playground in front.
+        Its walls change texture, a single light circles it and the camera never stops moving.
+      </p>
+      <div class="go">
+        <button id="enter" disabled><span id="enterTxt">loading</span></button>
+        <div id="loadTxt">starting up</div>
+      </div>
+    </div>
+
+    <div class="titleblock">
+      <div>Project</div><div><b>A building and a playground</b></div>
+      <div>Course</div><div>CSE4204 &mdash; Final project</div>
+      <div>Drawn by</div><div id="teamStart"></div>
+    </div>
+  </div>
+</div>
+<!-- ========================= HUD ========================= -->
+<div id="hud">
+  <div id="tele" class="panel">
+    <div class="row"><span class="lbl">Camera</span><span class="val hot" id="tCam">Orbit</span></div>
+    <div class="row"><span class="lbl">Camera angle</span><span class="val" id="tAngle">0&deg;</span></div>
+    <div class="row"><span class="lbl">Projection</span><span class="val hot" id="tProj">Perspective 50&deg;</span></div>
+    <div class="row"><span class="lbl">Light angle</span><span class="val" id="tLight">0&deg;</span></div>
+    <div class="row"><span class="lbl">Light elevation</span><span class="val" id="tLightH">41&deg;</span></div>
+    <div class="row"><span class="lbl">Sun</span><span class="val" id="tSun">14:00</span></div>
+    <div class="row"><span class="lbl">Frame</span><span class="val" id="tFps">60 fps</span></div>
+  </div>
+
+  <div id="facade" class="panel">
+    <div class="cap">Building texture</div>
+    <div class="name" id="fName">Red brick</div>
+    <div class="swatches" id="fSwatches"></div>
+    <div class="meter"><i id="fMeter"></i></div>
+    <div class="sub" id="fSub">next change in 12 s</div>
+  </div>
+
+  <div id="hints" class="panel">
+    <b>←</b><b>→</b> camera round the building &nbsp; <b>↑</b><b>↓</b> up and down &nbsp; <b>−</b><b>=</b> out and in &nbsp; <b>A</b> auto camera<br>
+    <b>Z</b><b>X</b> step the light &nbsp; <b>J</b> light auto &nbsp; <b>B</b> next texture &nbsp; <b>V</b> texture timer &nbsp;
+    <b>1</b>–<b>5</b> cameras &nbsp; <b>N</b> night &nbsp; <b>P</b> projection &nbsp; <b>I</b> notes
+  </div>
+
+  <div id="toast" class="panel"></div>
+</div>
+
+<div id="touch" class="hidden">
+  <div class="tb" id="tbLeft">&#9664;</div>
+  <div class="tb" id="tbRight">&#9654;</div>
+  <div class="tb" id="tbSkin">SKIN</div>
+  <div class="tb" id="tbLight">LIGHT</div>
+  <div class="tb" id="tbCam">CAM</div>
+  <div class="tb" id="tbNight">NIGHT</div>
+</div>
+
+<!-- ========================= BUILD NOTES ========================= -->
+<div id="info">
+  <div class="doc">
+    <h2>How this scene is built</h2>
+    <p class="note">
+      <span id="teamInfo"></span><br>
+      Every object is modelled from Three.js geometry primitives and every texture is drawn
+      at load time onto a canvas, so the project has no imported models and no downloaded
+      image files. Each row points at the part of the source that answers a requirement.
+    </p>
+    <table>
+      <thead><tr><th>Requirement</th><th>Where it lives</th><th>What to look for</th></tr></thead>
+      <tbody id="reqRows"></tbody>
+    </table>
+    <button class="close" id="infoClose">Back to the scene</button>
+  </div>
+</div>
+
+<div id="fatal" class="hidden">
+  <div>
+    <h2>This scene needs WebGL</h2>
+    <p>Open it in a recent Chrome, Edge or Firefox with hardware acceleration switched on.</p>
+  </div>
+</div>
+
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>
