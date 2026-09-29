@@ -13,17 +13,13 @@ import { buildPlayground } from './playground.js';
 import { animate } from './animation.js';
 import { CAM_MODES, applyPreset, ctl, initInteraction, keys, orbit, preset } from './interaction.js';
 
-/* ============================================================================
-   S1  TEAM — edit these two lines; the start screen and the notes use them
-   ========================================================================== */
+// Team
 const TEAM = [
   { name: 'Eusha Ahmed Mahi', id: '20220104032' },
   { name: 'Amirul Momin Utshaw', id: '20220104042' }
 ];
 
-/* ============================================================================
-   S2  REQUIREMENT MAP shown by the I key
-   ========================================================================== */
+// Requirements
 const REQUIREMENTS = [
   ['Custom shaders',
     '<code>shaders.js</code> &mdash; makeSkyMaterial, makeFacadeMaterial, makeFlagMaterial, makeGrassMaterial, attachLawnShader, attachRubberShader',
@@ -67,9 +63,7 @@ function fillTeam() {
   UI('fSwatches').innerHTML = SKINS.map(() => '<i></i>').join('');
 }
 
-/* ============================================================================
-   S3  HUD
-   ========================================================================== */
+// HUD
 let fpsAcc = 0, fpsCount = 0, fpsShown = 60, hudTimer = 0, fpsLast = 0;
 
 function updateHUD(dt) {
@@ -92,7 +86,7 @@ function updateHUD(dt) {
   UI('tSun').textContent = `${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.floor(hour % 1 * 60)).padStart(2, '0')}`;
   UI('tFps').textContent = fpsShown + ' fps';
 
-  /* the facade card */
+  // Facade
   const shown = facade.busy ? facade.next : facade.index;
   UI('fName').textContent = SKINS[shown].name;
   const sw = UI('fSwatches').children;
@@ -109,10 +103,8 @@ function updateHUD(dt) {
   }
 }
 
-/* ============================================================================
-   S4  CAMERA RIG — the camera moves around the building
-   ========================================================================== */
-const KEY_SWING = 1.1;         // radians per second while an arrow is held
+// Camera
+const KEY_SWING = 1.1;  // Speed
 const KEY_LIFT = 0.7;
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _goal = new THREE.Vector3();
 let camReady = false;
@@ -120,8 +112,6 @@ let camReady = false;
 function updateCamera(dt) {
   const p = preset();
 
-  /* held keys, read every frame so the movement is smooth and the same
-     speed whatever the frame rate */
   const kSwing = (keys['arrowleft'] || keys['q'] ? 1 : 0) - (keys['arrowright'] || keys['e'] ? 1 : 0);
   const kLift = (keys['arrowup'] || keys[','] ? 1 : 0) - (keys['arrowdown'] || keys['.'] ? 1 : 0);
   if (running && (kSwing || kLift)) {
@@ -131,9 +121,9 @@ function updateCamera(dt) {
   }
 
   if (!running) {
-    orbit.theta += dt * 0.06;                               // title card: a slow wide circle
+    orbit.theta += dt * 0.06;  // Title
   } else if (ctl.intro) {
-    /* the opening move: ease from the wide title shot into the orbit */
+    // Intro
     const it = ctl.intro;
     it.t += dt;
     const k = smoothstep(0, 1, Math.min(it.t / it.dur, 1));
@@ -157,7 +147,7 @@ function updateCamera(dt) {
     orbit.target.y + cp * orbit.dist,
     orbit.target.z + Math.sin(orbit.theta) * sp * orbit.dist
   );
-  _goal.y = Math.max(_goal.y, 1.2);                       // never under the lawn
+  _goal.y = Math.max(_goal.y, 1.2);  // Ground
 
   const look = orbit.look || orbit.target;
   if (!camReady) { camPos.copy(_goal); camLook.copy(look); camReady = true; }
@@ -165,15 +155,13 @@ function updateCamera(dt) {
   camPos.lerp(_goal, k);
   camLook.lerp(look, Math.min(1, dt * 4));
 
-  /* both cameras ride the same transform, so P swaps only the projection */
+  // Projection
   perspCam.position.copy(camPos); perspCam.lookAt(camLook);
   orthoCam.position.copy(camPos); orthoCam.lookAt(camLook);
   syncOrthoFrustum(Math.max(camPos.distanceTo(camLook), 5));
 }
 
-/* ============================================================================
-   S5  MAIN LOOP
-   ========================================================================== */
+// Loop
 let clock, running = false;
 
 function frame() {
@@ -201,9 +189,7 @@ function frame() {
   if (running) updateHUD(dt);
 }
 
-/* ============================================================================
-   S6  START UP
-   ========================================================================== */
+// Startup
 function hasWebGL() {
   try {
     const c = document.createElement('canvas');
@@ -288,8 +274,6 @@ async function boot() {
   buildFlag();
   initInteraction(renderer.domElement);
 
-  /* with one light and no environment map, a fully metallic surface has
-     nothing to reflect and turns black, so metals are kept mostly diffuse */
   scene.traverse(o => {
     if (!o.isMesh) return;
     for (const m of Array.isArray(o.material) ? o.material : [o.material]) {

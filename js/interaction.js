@@ -7,10 +7,7 @@ import { SKINS } from './textures.js';
 import { setTimeScale, timeScale } from './animation.js';
 import { skyMesh } from './world.js';
 
-/* ============================================================================
-   CAMERA STATE — the camera sits on a sphere around a target point.
-   theta is the angle around the target, phi the angle down from straight up.
-   ========================================================================== */
+// Camera
 const CAM_PRESETS = [
   { name: 'Orbit', target: [1, 9, -2], phi: 1.16, dist: 72, auto: true, minD: 34, maxD: 180, phiMin: 0.12, phiMax: 1.5 },
   { name: 'Playground', target: [0, 1.2, 35], phi: 1.08, dist: 30, auto: true, minD: 9, maxD: 90, phiMin: 0.12, phiMax: 1.5 },
@@ -24,18 +21,18 @@ const orbit = {
   phi: 1.2,
   dist: 110,
   distGoal: 110,
-  auto: true,           // the camera moves around the building on its own
-  autoSpeed: 0.11,      // radians per second
+  auto: true,  // Auto
+  autoSpeed: 0.11,  // Speed
   target: new THREE.Vector3(1, 9, -2),
   targetGoal: new THREE.Vector3(1, 9, -2),
   look: null
 };
 
-/* shared control state that main.js reads each frame */
+// Controls
 const ctl = {
   camMode: 0,
   dragging: false,
-  intro: null,          // the opening move after "Enter the scene"
+  intro: null,  // Intro
   dayTween: null
 };
 
@@ -58,9 +55,7 @@ function setCamMode(i) {
   toast(`Camera <b>${CAM_MODES[i].toLowerCase()}</b>`);
 }
 
-/* ============================================================================
-   MOUSE AND TOUCH
-   ========================================================================== */
+// Pointer
 let dragMoved = 0;
 const pointers = new Map();
 let pinchStart = 0, pinchDist = 0;
@@ -128,7 +123,7 @@ function initInteraction(canvas) {
   window.addEventListener('keydown', onKey);
   window.addEventListener('resize', onResize);
 
-  /* on-screen buttons for phones */
+  // Buttons
   if (matchMedia('(pointer: coarse)').matches) {
     UI('touch').classList.remove('hidden');
     const hold = (id, key) => {
@@ -149,7 +144,7 @@ function initInteraction(canvas) {
   }
 }
 
-/* --- click to name an object, by a ray cast from the pointer --- */
+// Picker
 const raycaster = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 function pickObject(e) {
@@ -167,10 +162,7 @@ function pickObject(e) {
   }
 }
 
-/* ============================================================================
-   KEYBOARD — held keys (camera movement) are read every frame in main.js
-   from the keys map; one-shot commands are handled here
-   ========================================================================== */
+// Keyboard
 function onKey(e) {
   if (e.target instanceof HTMLInputElement) return;
   const k = e.key.toLowerCase();
@@ -179,12 +171,9 @@ function onKey(e) {
   if (UI('info').classList.contains('on') && k === 'escape') { toggleInfo(); return; }
 
   switch (k) {
-    /* --- the camera moves around the building: arrows or Q / E and , / .
-       The movement itself is stepped in main.js updateCamera, this only
-       takes the camera off its automatic circle --- */
     case 'arrowleft': case 'arrowright': case 'arrowup': case 'arrowdown':
       e.preventDefault();
-    // falls through
+    // Fallthrough
     case 'q': case 'e': case ',': case '.':
       orbit.auto = false; ctl.intro = null;
       break;
@@ -205,14 +194,14 @@ function onKey(e) {
     case 'c':
       setCamMode((ctl.camMode + 1) % CAM_MODES.length); break;
 
-    /* --- the building texture --- */
+    // Texture
     case 'b': nextSkin(e.shiftKey ? -1 : 1); break;
     case 'v':
       facade.auto = !facade.auto; facade.timer = 0;
       toast(facade.auto ? `Texture changes every <b>${facade.interval} s</b>` : 'Texture <b>held</b> &mdash; press B to change it');
       break;
 
-    /* --- the light that rotates around the building --- */
+    // Light
     case 'j': toggleLightAuto(); break;
     case 'z': case 'x':
       orbitLight.auto = false;
@@ -236,7 +225,7 @@ function onKey(e) {
       toast(orbitLight.shadows ? 'Light casts <b>shadows</b>' : 'Shadows <b>off</b>');
       break;
 
-    /* --- everything else --- */
+    // Misc
     case ' ':
       e.preventDefault();
       setTimeScale(timeScale ? 0 : 1);

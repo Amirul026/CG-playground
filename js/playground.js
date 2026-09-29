@@ -6,9 +6,9 @@ import { attachRubberShader } from './shaders.js';
 import { scene } from './renderer.js';
 import { PLAY, makeBench, rod, shadowed, tag } from './world.js';
 
-/* the moving parts, read by animation.js every frame */
+// Parts
 const play = {
-  swings: [],          // { pivot, amp, phase, omega }
+  swings: [],  // Swing
   seesaw: null,
   carousel: null,
   carouselSpin: 0,
@@ -26,9 +26,7 @@ function materials() {
   wood = new THREE.MeshStandardMaterial({ map: TEX.wood, roughness: 0.75 });
 }
 
-/* ---------------------------------------------------------------------------
-   SAFETY SURFACE — one plane; the zones, tiles and games come from the shader
-   --------------------------------------------------------------------------- */
+// Surface
 function buildSurface() {
   const w = PLAY.x1 - PLAY.x0, d = PLAY.z1 - PLAY.z0;
   const mat = attachRubberShader(new THREE.MeshStandardMaterial({ map: TEX.rubber, roughness: 0.92 }));
@@ -40,10 +38,7 @@ function buildSurface() {
   scene.add(floor);
 }
 
-/* ---------------------------------------------------------------------------
-   FENCE — posts are one instanced mesh; rails are long boxes with a gap for
-   the gate, which gets an arch and a name board
-   --------------------------------------------------------------------------- */
+// Fence
 function buildFence() {
   const x0 = PLAY.x0 - 0.4, x1 = PLAY.x1 + 0.4, z0 = PLAY.z0 - 0.4, z1 = PLAY.z1 + 0.4;
   const gate = 2.0;
@@ -74,7 +69,7 @@ function buildFence() {
   rail(x0, z0, -gate, z0); rail(gate, z0, x1, z0);
   rail(x1, z0, x1, z1); rail(x1, z1, x0, z1); rail(x0, z1, x0, z0);
 
-  /* thin vertical pickets between the posts */
+  // Pickets
   const pickets = [];
   const pick = (ax, az, bx, bz) => {
     const len = Math.hypot(bx - ax, bz - az), n = Math.floor(len / 0.25);
@@ -90,13 +85,13 @@ function buildFence() {
   pim.userData.part = 'Fence';
   scene.add(pim);
 
-  /* gate arch */
+  // Gate
   const arch = new THREE.Group();
   for (const x of [-gate, gate]) arch.add(rod(new THREE.Vector3(x, 0, z0), new THREE.Vector3(x, 2.9, z0), 0.09, paintRed, 12));
   const curve = new THREE.QuadraticBezierCurve3(
     new THREE.Vector3(-gate, 2.9, z0), new THREE.Vector3(0, 3.7, z0), new THREE.Vector3(gate, 2.9, z0));
   arch.add(shadowed(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.09, 10, false), paintRed)));
-  /* two boards back to back, so the name reads the right way from both sides */
+  // Signboard
   const signMat = new THREE.MeshStandardMaterial({ map: TEX.playSign, roughness: 0.5 });
   for (const side of [-1, 1]) {
     const board = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.42), signMat);
@@ -108,12 +103,9 @@ function buildFence() {
   scene.add(arch);
 }
 
-/* ---------------------------------------------------------------------------
-   SWINGS — an A frame at each end, three swings on chains. Each swing hangs
-   from a pivot that animation.js rocks as a pendulum.
-   --------------------------------------------------------------------------- */
+// Swings
 function chain(length) {
-  /* links alternate by ninety degrees, merged into one geometry */
+  // Chain
   const parts = [];
   const pitch = 0.085, n = Math.floor(length / pitch);
   for (let i = 0; i < n; i++) {
@@ -158,7 +150,7 @@ function buildSwings() {
     seat.position.y = -2.08;
     pivot.add(seat);
     g.add(pivot);
-    /* a real pendulum: omega = sqrt(g / L) for a 2.1 m chain */
+    // Pendulum
     play.swings.push({ pivot, amp: s.amp, phase: s.phase, omega: Math.sqrt(9.81 / 2.1) });
   }
   g.position.set(cx, 0, cz);
@@ -166,12 +158,9 @@ function buildSwings() {
   scene.add(g);
 }
 
-/* ---------------------------------------------------------------------------
-   SLIDE — a tower with a ladder and a roof; the chute is swept by hand: a U
-   profile carried along a curve, with its own normals and uvs
-   --------------------------------------------------------------------------- */
+// Slide
 function sweptChute(curve, halfW, wallH, segs) {
-  /* the profile in (side, up) coordinates: straight wall, rounded bed, wall */
+  // Profile
   const prof = [];
   prof.push([-halfW, wallH]);
   for (let i = 0; i <= 12; i++) {
@@ -186,7 +175,7 @@ function sweptChute(curve, halfW, wallH, segs) {
     const t = i / segs;
     curve.getPointAt(t, P);
     curve.getTangentAt(t, T);
-    up.crossVectors(side, T).normalize().negate();           // perpendicular to the run, pointing up
+    up.crossVectors(side, T).normalize().negate();  // Up
     if (up.y < 0) up.negate();
     for (let j = 0; j < prof.length; j++) {
       const [s, u] = prof[j];
@@ -225,7 +214,7 @@ function buildSlide() {
   roof.position.y = 3.55; roof.rotation.y = Math.PI / 4;
   g.add(roof);
 
-  /* ladder on the far side */
+  // Ladder
   const lb = new THREE.Vector3(-2.2, 0, 0), lt = new THREE.Vector3(-half, deckH, 0);
   for (const s of [-0.3, 0.3]) g.add(rod(lb.clone().setZ(s), lt.clone().setZ(s), 0.04, steel, 8));
   for (let i = 1; i < 8; i++) {
@@ -233,7 +222,7 @@ function buildSlide() {
     g.add(rod(p.clone().setZ(-0.3), p.clone().setZ(0.3), 0.025, steel, 6));
   }
 
-  /* the chute: out from the deck, down, and a flat run out at the bottom */
+  // Chute
   const curve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(half, deckH + 0.05, 0),
     new THREE.Vector3(1.8, deckH - 0.15, 0),
@@ -253,12 +242,10 @@ function buildSlide() {
   scene.add(g);
 }
 
-/* ---------------------------------------------------------------------------
-   SEE-SAW — a plank on a pivot, rocked by animation.js
-   --------------------------------------------------------------------------- */
+// Seesaw
 function buildSeesaw() {
   const g = new THREE.Group();
-  /* a triangular stand, extruded across the plank */
+  // Stand
   const tri = new THREE.Shape();
   tri.moveTo(-0.35, 0); tri.lineTo(0.35, 0); tri.lineTo(0.06, 0.55); tri.lineTo(-0.06, 0.55); tri.closePath();
   const baseGeo = new THREE.ExtrudeGeometry(tri, { depth: 0.36, bevelEnabled: false });
@@ -289,9 +276,7 @@ function buildSeesaw() {
   scene.add(g);
 }
 
-/* ---------------------------------------------------------------------------
-   MERRY-GO-ROUND
-   --------------------------------------------------------------------------- */
+// Carousel
 function buildCarousel() {
   const g = new THREE.Group();
   const hub = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.3, 16), steel));
@@ -310,7 +295,7 @@ function buildCarousel() {
   knob.position.y = 1.28;
   spin.add(knob);
 
-  /* six hand rails from the centre post out to the rim */
+  // Rails
   for (let k = 0; k < 6; k++) {
     const a = k / 6 * TAU + TAU / 12;
     const out = new THREE.Vector3(Math.cos(a) * 1.55, 0.42, Math.sin(a) * 1.55);
@@ -326,10 +311,7 @@ function buildCarousel() {
   scene.add(g);
 }
 
-/* ---------------------------------------------------------------------------
-   CLIMBING DOME — the upper half of a subdivided icosahedron, every edge a
-   bar and every vertex a ball joint, merged into one mesh
-   --------------------------------------------------------------------------- */
+// Dome
 function buildDome() {
   const R = 3.0;
   const ico = new THREE.IcosahedronGeometry(R, 1);
@@ -369,9 +351,7 @@ function buildDome() {
   scene.add(dome);
 }
 
-/* ---------------------------------------------------------------------------
-   SANDPIT — a timber frame, a gently heaped sand bed, a bucket and spade
-   --------------------------------------------------------------------------- */
+// Sandpit
 function buildSandpit() {
   const g = new THREE.Group();
   const S = 5;
@@ -410,9 +390,7 @@ function buildSandpit() {
   scene.add(g);
 }
 
-/* ---------------------------------------------------------------------------
-   SPRING RIDER — a little painted duck on a coil spring, bounced by animation.js
-   --------------------------------------------------------------------------- */
+// Rider
 function buildSpringRider() {
   const g = new THREE.Group();
   const pts = [];

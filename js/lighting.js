@@ -3,16 +3,12 @@ import { TAU, lerp, smoothstep } from './helpers.js';
 import { SHADED } from './shaders.js';
 import { camera, renderer, scene } from './renderer.js';
 
-
-
-
 const SITE_CENTER = new THREE.Vector3(1, 0, -3);
 const LIGHT_DISTANCE = 130;         
 
 let sun = null;                      
 let skyMat = null;
 const glowHeads = [];                
-
 
 const orbitLight = {
   angle: 0.6,          
@@ -42,12 +38,11 @@ function initLights() {
   sun.shadow.camera.top = 58; sun.shadow.camera.bottom = -58;
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.4;
-  sun.target.position.set(1, 0, 12);      // middle of building + playground, so both stay in the shadow map
+  sun.target.position.set(1, 0, 12);      
   scene.add(sun);
   scene.add(sun.target);
 
-  /* very dim ambient so THREE.js built-in materials (ground, trims) also get
-     a fill; intensity is updated every frame to match the day / night cycle */
+ 
   ambientLight = new THREE.AmbientLight(0x9fb4e8, 0.18);
   scene.add(ambientLight);
 }
@@ -55,11 +50,9 @@ function initLights() {
 function addGlowHead(mat) { glowHeads.push(mat); }
 function setSkyMaterial(m) { skyMat = m; }
 
-/* the unit vector from the site toward the light */
 const lightDir = new THREE.Vector3();
 const _col = new THREE.Color(), _moon = new THREE.Color(0x9fb4e8);
 
-/* place the light on its circle; called every frame by animation.js */
 function placeLight(dt) {
   const a = orbitLight.angle, e = orbitLight.elevation;
   lightDir.set(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e));
@@ -68,19 +61,14 @@ function placeLight(dt) {
     lightDir.y * LIGHT_DISTANCE,
     SITE_CENTER.z + lightDir.z * LIGHT_DISTANCE
   );
-  /* by day the chosen colour, by night the same light turns into moonlight */
+ 
   _col.setHex(LIGHT_COLOURS[orbitLight.colourIndex].hex).lerp(_moon, 1 - dayFactor);
   sun.color.lerp(_col, Math.min(1, dt * 4));
   sun.intensity = orbitLight.on ? lerp(0.75, 3.2, dayFactor) : 0;
   sun.castShadow = orbitLight.on && orbitLight.shadows;
 }
 
-/* ============================================================================
-   TIME OF DAY — day and night change only the colour and strength of the one
-   light and the colours of the sky and the fog; where the light is, is
-   decided by the orbit above
-   ========================================================================== */
-let dayPhase = 0.30;              // 0 sunrise · 0.25 noon · 0.5 sunset · 0.75 midnight
+let dayPhase = 0.30;             
 let dayAuto = false;
 let dayFactor = 1, nightFactor = 0;
 
@@ -92,7 +80,7 @@ const HOR_DAY = new THREE.Color(0xdde7ee), HOR_DUSK = new THREE.Color(0xf29a52),
 const _fog = new THREE.Color(), _sky = new THREE.Color();
 
 function updateSky() {
-  const h = Math.sin(dayPhase * TAU) * 0.92;         // how high the day is
+  const h = Math.sin(dayPhase * TAU) * 0.92;         
   dayFactor = smoothstep(-0.08, 0.22, h);
   nightFactor = 1 - smoothstep(-0.05, 0.12, h);
   const dusk = 1 - smoothstep(0.0, 0.32, Math.abs(h));
@@ -112,24 +100,20 @@ function updateSky() {
     u.uGround.value.copy(_fog);
   }
 
-  /* lamp heads and the like glow at night; they are emissive, not lights */
+  
   for (const m of glowHeads) m.emissiveIntensity = 0.1 + nightFactor * 3.0;
 
-  /* dim ambient for built-in THREE materials — sky blue by day, moonlit blue at night */
+  
   if (ambientLight) {
     ambientLight.color.set(dayFactor > 0.5 ? 0xb8cfe8 : 0x9fb4e8);
-    ambientLight.intensity = lerp(0.18, 0.06, dayFactor);   // brighter at night (relative to sun)
+    ambientLight.intensity = lerp(0.18, 0.06, dayFactor);  
   }
 }
 
-/* Ambient colour for the hand-written shaders: sky-blue fill by day,
-   cool moonlit blue at night.  Kept as a module-level colour so we only
-   allocate once. */
 const _ambient = new THREE.Color();
 
-/* push the one light into every hand-written shader */
 function updateShaderLights() {
-  /* day: a gentle sky-tinted fill; night: a soft cool moonlit blue */
+  
   const ambDay = 0.13, ambNight = 0.22;
   _ambient.copy(_sky).multiplyScalar(lerp(ambNight, ambDay, dayFactor));
 
@@ -137,7 +121,7 @@ function updateShaderLights() {
     const u = m.uniforms;
     u.uSunDir.value.copy(lightDir);
     u.uSunColor.value.copy(sun.color);
-    u.uSunPower.value = sun.intensity * 0.21;   // keep textures in readable contrast range
+    u.uSunPower.value = sun.intensity * 0.21;   
     u.uSkyTint.value.copy(_sky).lerp(scene.fog.color, 0.4);
     u.uCamPos.value.copy(camera.position);
     u.uFogColor.value.copy(scene.fog.color);

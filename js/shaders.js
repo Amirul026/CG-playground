@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 
-/* ============================================================================
-   GLSL building blocks shared by the hand-written programs
-   ========================================================================== */
+// GLSL
 
 const GLSL_NOISE = `
 float hash21(vec2 p){ p = fract(p * vec2(233.34, 851.73)); p += dot(p, p + 23.45); return fract(p.x * p.y); }
@@ -18,9 +16,8 @@ float fbm(vec2 p){
   return v;
 }`;
 
-
 const GLSL_LIGHTS = `
-uniform vec3  uSunDir;      // toward the light that circles the building
+uniform vec3  uSunDir;  // Sun
 uniform vec3  uSunColor;
 uniform float uSunPower;
 uniform vec3  uSkyTint;    
@@ -34,7 +31,7 @@ vec3 shade(vec3 albedo, vec3 N, vec3 V, vec3 P, float shininess, float specular)
   float ndl = max(dot(N, L), 0.0);
   vec3 H = normalize(L + V);
   vec3 direct = uSunColor * uSunPower * ndl * (albedo + specular * pow(max(dot(N, H), 0.0), shininess));
-  float hemi = 0.5 + 0.5 * N.y;   // 1 = faces up, 0 = faces down
+  float hemi = 0.5 + 0.5 * N.y;  // Hemisphere
   return direct + uAmbient * albedo * hemi;
 }
 
@@ -59,7 +56,7 @@ function lightUniforms() {
   };
 }
 
-/*world normal */
+// Normal
 const VERT_WORLD = `
 varying vec2 vUv; varying vec3 vN; varying vec3 vWP;
 void main(){
@@ -69,7 +66,6 @@ void main(){
   vWP = wp.xyz;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
-
 
 function makeSkyMaterial() {
   return new THREE.ShaderMaterial({
@@ -108,16 +104,16 @@ function makeSkyMaterial() {
        
         float sd = max(dot(d, S), 0.0);
         float day = uDay * uLightOn, night = (1.0 - uDay) * uLightOn;
-        col += uHorizon * pow(sd, 5.0) * 0.18 * day;               // warm halo
+        col += uHorizon * pow(sd, 5.0) * 0.18 * day;  // Halo
         col += vec3(1.0, 0.93, 0.78) * smoothstep(0.9986, 0.9997, sd) * 8.0 * day;
         col += vec3(1.0, 0.85, 0.6) * pow(sd, 300.0) * 1.5 * day;
-        /* moon — larger disc, atmospheric halo layers so it reads clearly */
-        col += vec3(0.12, 0.16, 0.38) * pow(sd, 4.0)  * 0.35 * night;   // wide outer glow
-        col += vec3(0.25, 0.33, 0.62) * pow(sd, 18.0) * 0.55 * night;   // inner corona
+        // Moon
+        col += vec3(0.12, 0.16, 0.38) * pow(sd, 4.0)  * 0.35 * night;  // Glow
+        col += vec3(0.25, 0.33, 0.62) * pow(sd, 18.0) * 0.55 * night;  // Corona
         col += vec3(0.80, 0.88, 1.00) * smoothstep(0.9975, 0.9991, sd) * 4.0 * night;  
         col += vec3(0.96, 0.97, 1.00) * smoothstep(0.9992, 0.9997, sd) * 6.5 * night;  
 
-        /* stars ,twinkling */
+        // Stars
         if (h > 0.0) {
           vec2 g = d.xz / (h + 0.35) * 160.0;
           vec2 id = floor(g), f = fract(g) - 0.5;
@@ -142,7 +138,6 @@ function makeSkyMaterial() {
       }`
   });
 }
-
 
 function makeFacadeMaterial(skinA, mask, topY) {
   return registerShaded(new THREE.ShaderMaterial({
@@ -179,7 +174,7 @@ function makeFacadeMaterial(skinA, mask, topY) {
         vec4 m = texture2D(uMask, vUv);
         float glass = m.r;
 
-        /* --- the wipe between the two skins --- */
+        // Wipe
         float h = vWP.y / uTop;
         float wob = (fbm(vec2(vWP.x + vWP.z, vWP.y) * 0.28 + uTime * 0.15) - 0.5) * 0.14;
         float front = uMix * 1.35 - 0.18;
@@ -187,7 +182,7 @@ function makeFacadeMaterial(skinA, mask, topY) {
         float newSide = 1.0 - smoothstep(front - 0.012, front + 0.012, hw);
         vec3 albedo = mix(texture2D(uSkinA, vUv).rgb, texture2D(uSkinB, vUv).rgb, newSide);
 
-        /* --- lighting: glass is darker, shinier and reflects the sky --- */
+        // Lighting
         float shin = mix(18.0, 160.0, glass);
         float spec = mix(0.06, 1.1, glass);
         vec3 col = shade(albedo * (1.0 - 0.3 * glass), N, V, vWP, shin, spec);
@@ -197,25 +192,20 @@ function makeFacadeMaterial(skinA, mask, topY) {
         vec3 refl = mix(vec3(0.06, 0.07, 0.06), uSkyTint, smoothstep(-0.2, 0.4, R.y));
         col += refl * glass * (0.10 + 0.7 * fres);
 
-        /* --- rooms that are lit at night. One random number per window,
-               taken from the bay, the storey and a seed for each wall, so a
-               window on a curved wall stays one colour all the way across --- */
         vec2 cell = floor(vUv);
-        float sd = floor(vSeed + 0.5);          // whole numbers: interpolation must not wobble it
+        float sd = floor(vSeed + 0.5);  // Seed
         float id = hash21(cell + vec2(sd * 37.0, sd * 11.0));
-        float slot = floor(uTime / 40.0 + id * 5.0);                   // a few rooms switch every so often
+        float slot = floor(uTime / 40.0 + id * 5.0);  // Switch
         float on = step(0.45, hash21(vec2(id * 91.0, slot)));
         vec3 warm = mix(vec3(1.0, 0.72, 0.40), vec3(0.78, 0.86, 1.0), step(0.82, fract(id * 17.0)));
         float fy = fract(vUv.y);
-        float roomGrad = 0.55 + 0.45 * smoothstep(0.3, 0.86, fy);      // ceiling light brighter at the top
+        float roomGrad = 0.55 + 0.45 * smoothstep(0.3, 0.86, fy);  // Gradient
         col = mix(col, warm * roomGrad * 1.35, glass * on * uNight * 0.92);
 
-        /* --- the glowing edge of the wipe --- */
+        // Seam
         float wiping = step(0.001, uMix) * step(uMix, 0.999);
-        float seam      = 1.0 - smoothstep(0.0,   0.018, abs(hw - front));   // sharp core line
-        float seamGlow  = 1.0 - smoothstep(0.0,   0.042, abs(hw - front));   // warm halo
-        /* Keep the glow well below 1.0 so ACES doesn't clip it to white.
-           Strong saturated orange reads as a paint / fire edge, not a flash. */
+        float seam      = 1.0 - smoothstep(0.0,   0.018, abs(hw - front));  // Core
+        float seamGlow  = 1.0 - smoothstep(0.0,   0.042, abs(hw - front));  // Halo
         col += vec3(1.0, 0.50, 0.10) * seam     * wiping * 1.4;
         col += vec3(0.8, 0.30, 0.06) * seamGlow * wiping * 0.55;
 
@@ -226,7 +216,6 @@ function makeFacadeMaterial(skinA, mask, topY) {
       }`
   }));
 }
-
 
 function makeFlagMaterial(map) {
   return registerShaded(new THREE.ShaderMaterial({
@@ -257,7 +246,7 @@ function makeFlagMaterial(map) {
       void main(){
         vec3 V = normalize(uCamPos - vWP);
         vec3 N = normalize(vN);
-        if (dot(N, V) < 0.0) N = -N;                             // lit from both sides
+        if (dot(N, V) < 0.0) N = -N;  // Twosided
         vec3 base = texture2D(map, vUv).rgb;
         vec3 col = shade(base, N, V, vWP, 12.0, 0.08);
         col = addFog(col, length(uCamPos - vWP));
@@ -267,7 +256,6 @@ function makeFlagMaterial(map) {
       }`
   }));
 }
-
 
 function makeGrassMaterial(map) {
   return registerShaded(new THREE.ShaderMaterial({
@@ -306,7 +294,6 @@ function makeGrassMaterial(map) {
   }));
 }
 
-
 function attachLawnShader(mat, dirtTex) {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uDirt = { value: dirtTex };
@@ -326,12 +313,12 @@ function attachLawnShader(mat, dirtTex) {
           vec3 broad = texture2D(map, w * 0.011).rgb;
           diffuseColor.rgb *= 0.72 + broad * 0.62;
 
-          /* mowing stripes, fading out away from the site */
+          // Stripes
           float near = 1.0 - smoothstep(60.0, 95.0, length(w - vec2(0.0, 12.0)));
           float stripe = step(0.5, fract(w.x / 7.0));
           diffuseColor.rgb *= 1.0 + (stripe - 0.5) * 0.13 * near;
 
-          /* a worn patch in front of each bench and along the desire line to the gate */
+          // Wear
           float n = fbm(w * 0.35);
           float wear = 0.0;
           wear = max(wear, 1.0 - smoothstep(0.6, 2.4, abs(w.x - 21.5) + max(0.0, abs(w.y - 26.0) - 7.0)));
@@ -345,12 +332,7 @@ function attachLawnShader(mat, dirtTex) {
   return mat;
 }
 
-/* ============================================================================
-   PLAYGROUND FLOOR — the standard material again. The grey rubber texture is
-   tinted by zone (green under the swings, blue under the slide...), laid out
-   in tiles, and the games are painted on in the shader: a hopscotch and a
-   grid of spots, so they stay crisp however close the camera gets.
-   ========================================================================== */
+// Floor
 function attachRubberShader(mat) {
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
@@ -369,7 +351,7 @@ function attachRubberShader(mat) {
           vec2 w = vWorldP.xz;
           float grain = texture2D(map, w * 0.5).r;
 
-          /* zones: terracotta by default, green and blue under the equipment */
+          // Zones
           vec3 zone = vec3(0.62, 0.24, 0.16);
           if (box(w, vec2(-12.0, 42.0), vec2(5.0, 4.6)) < 0.0) zone = vec3(0.22, 0.46, 0.25);
           if (length(w - vec2(12.0, 29.0)) < 4.6) zone = vec3(0.22, 0.46, 0.25);
@@ -377,12 +359,12 @@ function attachRubberShader(mat) {
           if (length(w - vec2(3.0, 38.0)) < 3.3) zone = vec3(0.16, 0.33, 0.56);
           diffuseColor.rgb = zone * (0.62 + 0.75 * grain);
 
-          /* one metre tiles */
+          // Tiles
           vec2 f = abs(fract(w) - 0.5);
           float grout = smoothstep(0.485, 0.5, max(f.x, f.y));
           diffuseColor.rgb *= 1.0 - grout * 0.3;
 
-          /* hopscotch: single, single, double, single, double, half circle */
+          // Hopscotch
           float paint = 0.0;
           vec2 hp = w - vec2(0.0, 24.0);
           paint = max(paint, outline(box(hp, vec2(0.0, 0.5), vec2(0.5, 0.5)), 0.03));
@@ -395,7 +377,7 @@ function attachRubberShader(mat) {
           vec2 top = hp - vec2(0.0, 5.0);
           if (top.y > 0.0) paint = max(paint, outline(length(top) - 0.9, 0.03));
 
-          /* a grid of coloured spots */
+          // Spots
           vec3 spotCol = vec3(0.0);
           float spot = 0.0;
           vec2 sp = w - vec2(-6.5, 26.0);

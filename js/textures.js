@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { TAU, clamp, rng } from './helpers.js';
 
-
-
 const TEX = {};
 
 function canvas2d(w, h) {
@@ -10,7 +8,6 @@ function canvas2d(w, h) {
   c.width = w; c.height = h || w;
   return [c, c.getContext('2d')];
 }
-
 
 function noise2(size, octaves, seed, gain, cells0) {
   const out = new Float32Array(size * size);
@@ -39,7 +36,6 @@ function noise2(size, octaves, seed, gain, cells0) {
   return out;
 }
 
-
 function paintPixels(g, S, fn) {
   const img = g.createImageData(S, S), d = img.data, px = [0, 0, 0];
   for (let y = 0; y < S; y++) {
@@ -51,7 +47,6 @@ function paintPixels(g, S, fn) {
   }
   g.putImageData(img, 0, 0);
 }
-
 
 function grime(g, S, n, amount) {
   const img = g.getImageData(0, 0, S, S), d = img.data;
@@ -72,12 +67,11 @@ function makeTex(c, rx, ry, srgb) {
   return t;
 }
 
-
 const BAY = { w: 3.2, h: 3.4 };
 const WIN = { x0: 0.035, x1: 0.965, y0: 0.30, y1: 0.88, frame: 0.022, mullion: 0.02, transom: 0.72 };
 const SKIN_SIZE = 512;
 
-/* the window  */
+// Window
 function windowRects(S) {
   const ox = WIN.x0 * S, oy = (1 - WIN.y1) * S;
   const ow = (WIN.x1 - WIN.x0) * S, oh = (WIN.y1 - WIN.y0) * S;
@@ -115,7 +109,6 @@ function drawWindow(g, S, frameCol, glassTop, glassBottom) {
   }
 }
 
-
 function texWindowMask() {
   const S = SKIN_SIZE, [c, g] = canvas2d(S);
   g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
@@ -128,13 +121,11 @@ function texWindowMask() {
   return t;
 }
 
-
 function spandrel(g, S, fill) {
   const top = (1 - WIN.y1) * S, bottom = (1 - WIN.y0) * S;
   fill(0, 0, S, top);                  
   fill(0, bottom, S, S - bottom);      
 }
-
 
 function skinWhite() {
   const S = SKIN_SIZE, [c, g] = canvas2d(S);
@@ -144,12 +135,11 @@ function skinWhite() {
     px[0] = 228 + v; px[1] = 229 + v; px[2] = 226 + v;
   });
   const bottom = (1 - WIN.y0) * S;
-  g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(0, bottom + S * 0.03, S, 2);   // panel joint
+  g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(0, bottom + S * 0.03, S, 2);  // Joint
   g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(0, S - 3, S, 3);
   drawWindow(g, S, '#e9ecec', '#7fa6ab', '#244a52');
   return makeTex(c);
 }
-
 
 function skinTerracotta() {
   const S = SKIN_SIZE, [c, g] = canvas2d(S);
@@ -171,7 +161,6 @@ function skinTerracotta() {
   return makeTex(c);
 }
 
-
 function skinBlueGlass() {
   const S = SKIN_SIZE, [c, g] = canvas2d(S);
   const grd = g.createLinearGradient(0, 0, S, S);
@@ -185,7 +174,6 @@ function skinBlueGlass() {
   drawWindow(g, S, '#c3cbd3', '#7fa0c2', '#1c3350');
   return makeTex(c);
 }
-
 
 function skinSandstone() {
   const S = SKIN_SIZE, [c, g] = canvas2d(S);
@@ -204,7 +192,6 @@ function skinSandstone() {
   drawWindow(g, S, '#5a4630', '#8aa0ad', '#26323b');
   return makeTex(c);
 }
-
 
 function skinGranite() {
   const S = SKIN_SIZE, [c, g] = canvas2d(S);
@@ -229,7 +216,6 @@ const SKINS = [
   { name: 'Charcoal granite', build: skinGranite, trim: 0x8d8f93 }
 ];
 
-
 function texTerracotta() {
   const S = 512, [c, g] = canvas2d(S);
   g.fillStyle = '#cdbfb0'; g.fillRect(0, 0, S, S);
@@ -247,7 +233,6 @@ function texTerracotta() {
   return makeTex(c);
 }
 
-
 function texRedPaving() {
   const S = 512, [c, g] = canvas2d(S);
   g.fillStyle = '#8f7f72'; g.fillRect(0, 0, S, S);
@@ -263,7 +248,6 @@ function texRedPaving() {
   return makeTex(c);
 }
 
-
 function texArchSign(text) {
   const [c, g] = canvas2d(2048, 160);
   g.fillStyle = '#f7f7f2'; g.fillRect(0, 0, 2048, 160);
@@ -274,10 +258,9 @@ function texArchSign(text) {
   g.fillText(text, 1024, 84, 1960);
   return makeTex(c);
 }
-//end b
+// End
 
-//s p g 
-
+// Ground
 
 function texPaving() {
   const S = 512, [c, g] = canvas2d(S);
@@ -292,7 +275,6 @@ function texPaving() {
   grime(g, S, noise2(S, 5, 607, 0.55, 4), 40);
   return makeTex(c);
 }
-
 
 function texGrass() {
   const S = 256, [c, g] = canvas2d(S);
@@ -318,7 +300,6 @@ function texGrass() {
   return makeTex(c);
 }
 
-
 function texDirt() {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 800, 0.55, 4);
@@ -328,7 +309,6 @@ function texDirt() {
   });
   return makeTex(c);
 }
-
 
 function texSand() {
   const S = 256, [c, g] = canvas2d(S);
@@ -340,7 +320,6 @@ function texSand() {
   });
   return makeTex(c);
 }
-
 
 function texRubber() {
   const S = 256, [c, g] = canvas2d(S);
@@ -357,7 +336,6 @@ function texRubber() {
   return t;
 }
 
-
 function texRoof() {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 5, 1100, 0.6, 8);
@@ -368,7 +346,6 @@ function texRoof() {
   });
   return makeTex(c);
 }
-
 
 function texConcrete(base) {
   const S = 256, [c, g] = canvas2d(S);
@@ -385,7 +362,6 @@ function texConcrete(base) {
   return makeTex(c);
 }
 
-
 function texWood(r, gr, b) {
   const S = 256, [c, g] = canvas2d(S);
   const n = noise2(S, 4, 1300 + r, 0.5, 4);
@@ -399,21 +375,19 @@ function texWood(r, gr, b) {
   return makeTex(c);
 }
 
-
 function texPaint(hex) {
   const S = 128, [c, g] = canvas2d(S);
   g.fillStyle = hex; g.fillRect(0, 0, S, S);
   grime(g, S, noise2(S, 4, hex.length * 97 + parseInt(hex.slice(1), 16) % 997, 0.5, 4), 18);
   const rand = rng(1400);
   g.strokeStyle = 'rgba(255,255,255,.18)';
-  for (let k = 0; k < 14; k++) {                  // scuffs from little shoes
+  for (let k = 0; k < 14; k++) {  // Scuffs
     g.lineWidth = 0.6 + rand();
     const x = rand() * S, y = rand() * S;
     g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rand() - 0.5) * 20, y + (rand() - 0.5) * 6); g.stroke();
   }
   return makeTex(c);
 }
-
 
 function texMetal(base) {
   const S = 256, [c, g] = canvas2d(S);
@@ -429,7 +403,6 @@ function texMetal(base) {
   return makeTex(c);
 }
 
-
 function texVent() {
   const S = 128, [c, g] = canvas2d(S);
   g.fillStyle = '#a9afb4'; g.fillRect(0, 0, S, S);
@@ -438,7 +411,6 @@ function texVent() {
   g.strokeStyle = '#7d848a'; g.lineWidth = 4; g.strokeRect(4, 4, S - 8, S - 8);
   return makeTex(c);
 }
-
 
 function texSolar() {
   const S = 256, [c, g] = canvas2d(S);
@@ -455,7 +427,6 @@ function texSolar() {
   }
   return makeTex(c);
 }
-
 
 function texBark() {
   const S = 256, [c, g] = canvas2d(S);
@@ -479,7 +450,6 @@ function texLeaf() {
   return makeTex(c);
 }
 
-
 function texDoor() {
   const [c, g] = canvas2d(256, 256);
   g.fillStyle = '#3b3f45'; g.fillRect(0, 0, 256, 256);
@@ -497,7 +467,6 @@ function texDoor() {
   return makeTex(c);
 }
 
-
 function texPlaque(text) {
   const [c, g] = canvas2d(1024, 96);
   g.fillStyle = '#20252c'; g.fillRect(0, 0, 1024, 96);
@@ -509,7 +478,6 @@ function texPlaque(text) {
   return makeTex(c);
 }
 
-
 function texFlag() {
   const W = 500, H = 300, [c, g] = canvas2d(W, H);
   g.fillStyle = '#006a4e'; g.fillRect(0, 0, W, H);
@@ -519,7 +487,6 @@ function texFlag() {
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
 }
-
 
 function texCarousel() {
   const S = 512, [c, g] = canvas2d(S);
@@ -536,7 +503,6 @@ function texCarousel() {
   return makeTex(c);
 }
 
-
 function texGlow() {
   const S = 128, [c, g] = canvas2d(S);
   const grd = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
@@ -549,7 +515,6 @@ function texGlow() {
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
 }
-
 
 function texTuft() {
   const S = 128, [c, g] = canvas2d(S);
@@ -572,6 +537,4 @@ export {
   texMetal, texPaint, texPaving, texPlaque, texRoof, texRubber, texSand, texSolar, texTuft, texVent,
   texWindowMask, texWood
 };
-
-
 

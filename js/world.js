@@ -6,17 +6,10 @@ import { attachLawnShader, makeFlagMaterial, makeGrassMaterial, makeSkyMaterial 
 import { scene } from './renderer.js';
 import { addGlowHead, setSkyMaterial } from './lighting.js';
 
-/* ----------------------------------------------------------------------------
-   SITE PLAN (metres, y up, the building's front faces +z)
-     building      x -22 … 24, z -17 … 15.6 (stairs included)
-     forecourt     x -28 … 30, z -24 … 17
-     path          x ±2,    z 17 … 22
-     playground    x ±20,   z 22 … 48
-   ---------------------------------------------------------------------------- */
 const PLAZA = { x0: -28, x1: 30, z0: -24, z1: 17 };
 const PLAY = { x0: -20, x1: 20, z0: 22, z1: 48 };
 
-/* is a point on grass, clear of the paving, playground and a margin round them */
+// Grass
 function isOpenLawn(x, z, margin) {
   const m = margin || 0;
   if (x > PLAZA.x0 - m && x < PLAZA.x1 + m && z > PLAZA.z0 - m && z < PLAZA.z1 + m) return false;
@@ -25,7 +18,7 @@ function isOpenLawn(x, z, margin) {
   return true;
 }
 
-/* tag every mesh under an object with a name the click picker can report */
+// Tag
 function tag(obj, name) {
   obj.traverse(o => { o.userData.part = name; });
   return obj;
@@ -37,7 +30,7 @@ function shadowed(mesh, cast, receive) {
   return mesh;
 }
 
-/* a cylinder stretched between two points, used for legs, chains and bars */
+// Cylinder
 const _up = new THREE.Vector3(0, 1, 0);
 function rod(a, b, radius, mat, radial) {
   const dir = new THREE.Vector3().subVectors(b, a);
@@ -48,9 +41,7 @@ function rod(a, b, radius, mat, radial) {
   return shadowed(m);
 }
 
-/* ============================================================================
-   SKY AND GROUND
-   ========================================================================== */
+// Ground
 let skyMat, skyMesh, lawn;
 
 function buildSky() {
@@ -64,7 +55,7 @@ function buildSky() {
 
 function buildGround() {
   const grass = TEX.grass.clone();
-  grass.repeat.set(650, 650);                     // four metres per tile
+  grass.repeat.set(650, 650);  // Tile
   grass.needsUpdate = true;
   const mat = attachLawnShader(new THREE.MeshStandardMaterial({ map: grass, roughness: 1, metalness: 0 }), TEX.dirt);
   lawn = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), mat);
@@ -74,7 +65,7 @@ function buildGround() {
   lawn.userData.part = 'Lawn';
   scene.add(lawn);
 
-  /* the plaza round the building */
+  // Plaza
   const pw = PLAZA.x1 - PLAZA.x0, pd = PLAZA.z1 - PLAZA.z0;
   const pav = TEX.redPaving.clone();
   pav.repeat.set(pw / 4, pd / 4);
@@ -87,7 +78,7 @@ function buildGround() {
   plaza.userData.part = 'Brick forecourt';
   scene.add(plaza);
 
-  /* the path to the playground gate */
+  // Path
   const pth = TEX.paving.clone();
   pth.repeat.set(1, 6 / 4);
   pth.needsUpdate = true;
@@ -98,7 +89,7 @@ function buildGround() {
   path.userData.part = 'Path to the playground';
   scene.add(path);
 
-  /* granite kerbs along the plaza edge */
+  // Kerbs
   const kerbMat = new THREE.MeshStandardMaterial({ map: TEX.concreteLight, color: 0xbab5ad, roughness: 0.8 });
   const kerb = (x, z, w, d) => {
     const k = shadowed(new THREE.Mesh(new THREE.BoxGeometry(w, 0.14, d), kerbMat));
@@ -113,11 +104,7 @@ function buildGround() {
   kerb((PLAZA.x1 + 2) / 2, PLAZA.z1, PLAZA.x1 - 2 + 0.3, 0.3);
 }
 
-/* ============================================================================
-   TREES — trunks and crowns are two instanced meshes, so sixty trees are two
-   draw calls. The crown is an icosahedron pushed about by a hash of each
-   vertex position, so shared corners move together and the ball stays closed.
-   ========================================================================== */
+// Trees
 let treeTrunks, treeCrowns;
 const TREES = [];
 
@@ -139,7 +126,7 @@ function lumpyBall(radius, seed) {
 function buildTrees() {
   const rand = rng(4242);
 
-  /* a hand placed avenue along the west side, then a scatter further out */
+  // Avenue
   for (let z = -20; z <= 44; z += 8) TREES.push({ x: -33 + (rand() - 0.5) * 1.5, z, s: 0.9 + rand() * 0.25 });
   for (let x = -24; x <= 24; x += 8) TREES.push({ x, z: -29 + (rand() - 0.5) * 1.5, s: 0.95 + rand() * 0.2 });
   let tries = 0;
@@ -184,9 +171,7 @@ function buildTrees() {
   }
 }
 
-/* ============================================================================
-   GRASS TUFTS
-   ========================================================================== */
+// Tufts
 let grassMat;
 function buildGrassTufts() {
   const a = new THREE.PlaneGeometry(0.9, 0.62); a.translate(0, 0.31, 0);
@@ -213,10 +198,7 @@ function buildGrassTufts() {
   scene.add(mesh);
 }
 
-/* ============================================================================
-   STREET LAMPS — the heads glow at night, but they are not light sources:
-   the only light in the scene is the one circling the building
-   ========================================================================== */
+// Lamps
 function buildStreetLamps() {
   const poleMat = new THREE.MeshStandardMaterial({ map: TEX.metalDark, metalness: 0.7, roughness: 0.4 });
   const spots = [[-26.5, -20], [28.5, -20], [-26.5, 14.5], [28.5, 14.5], [-22.5, 30], [22.5, 42]];
@@ -227,7 +209,7 @@ function buildStreetLamps() {
     base.position.y = 0.25;
     const pole = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 5.4, 10), poleMat));
     pole.position.y = 3.0;
-    const dir = x < 0 ? 1 : -1;                           // arm points in toward the site
+    const dir = x < 0 ? 1 : -1;  // Arm
     const arm = rod(new THREE.Vector3(0, 5.5, 0), new THREE.Vector3(dir * 1.1, 5.75, 0), 0.05, poleMat);
     const headMat = new THREE.MeshStandardMaterial({ color: 0x2a2d31, emissive: 0xffd49a, emissiveIntensity: 0.2, roughness: 0.4 });
     const head = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.36), headMat));
@@ -240,9 +222,7 @@ function buildStreetLamps() {
   }
 }
 
-/* ============================================================================
-   BENCHES
-   ========================================================================== */
+// Benches
 let benchWood, benchIron;
 function makeBench() {
   if (!benchWood) {
@@ -279,10 +259,7 @@ function buildBenches() {
   place(-24, 36, Math.PI / 2);
 }
 
-/* ============================================================================
-   FLAG POLE ON THE FORECOURT, flying the flag of Bangladesh — the flag
-   itself is the wave shader in shaders.js
-   ========================================================================== */
+// Flag
 let flagMat;
 function buildFlag() {
   const g = new THREE.Group();
@@ -297,8 +274,8 @@ function buildFlag() {
   base.position.y = 0.17;
 
   flagMat = makeFlagMaterial(TEX.flag);
-  const flagGeo = new THREE.PlaneGeometry(3, 1.8, 30, 12);      // 10 : 6
-  flagGeo.translate(1.5, 0, 0);                      // hinge on the pole side
+  const flagGeo = new THREE.PlaneGeometry(3, 1.8, 30, 12);  // Ratio
+  flagGeo.translate(1.5, 0, 0);  // Hinge
   const flag = new THREE.Mesh(flagGeo, flagMat);
   flag.position.set(0.08, 10.8, 0);
   flag.castShadow = true;

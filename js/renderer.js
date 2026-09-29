@@ -26,7 +26,6 @@ function initRenderer() {
   camera = perspCam;
 }
 
-
 function syncOrthoFrustum(distance) {
   const aspect = window.innerWidth / window.innerHeight;
   const halfH = Math.tan(THREE.MathUtils.degToRad(perspCam.fov) * 0.5) * distance;

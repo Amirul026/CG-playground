@@ -5,27 +5,8 @@ import { makeFacadeMaterial } from './shaders.js';
 import { scene } from './renderer.js';
 import { rod, shadowed, tag } from './world.js';
 
-/* ----------------------------------------------------------------------------
-   The building follows the main entrance of the AUST campus: a solid
-   terracotta tower and a glass block with a rounded corner on the left, a
-   white building with curved, cantilevered floors on the right, a grand
-   staircase between them up to a raised court, and a ribbed white arch over
-   the stairs carrying the university's name. Behind the court stands a
-   five storey block with the entrance doors.
-
-   The glazed walls are not boxes: each is swept along a footprint of straight
-   runs and curves (wallAlong), and its texture coordinates count bays along
-   the wall and storeys up it, so one tile of a skin is one window bay wherever
-   it lands, curved or straight.
-
-   Site plan (metres, the front faces +z):
-     red tower     x -22 … -17      glass block  x -17 … -8
-     white block   x   8 …  24      back block   x  -8 …  8, z -17 … -8
-     court         x  -8 …   8, z -8 … 6, 3 m up
-     stairs        z   6 … 15.6     arch         z -6 … 9
-   ---------------------------------------------------------------------------- */
 const STOREY = BAY.h;
-const TOWER_TOP = 8 * STOREY;           // the red tower is the tallest thing on site
+const TOWER_TOP = 8 * STOREY;          
 const COURT_Y = 3.0;
 
 let building, facadeMat;
@@ -34,23 +15,17 @@ const roofFans = [];
 let beaconMat;
 let seedCounter = 1;
 
-/* the texture change the brief asks for */
 const facade = {
-  index: 0,           // skin on the building now
-  next: 0,            // skin being wiped in
+  index: 0,           
+  next: 0,            
   busy: false,
   t: 0,
-  dur: 3.4,           // seconds for the wipe to climb the building
-  auto: true,         // change on a timer
+  dur: 3.4,           
+  auto: true,         
   timer: 0,
-  interval: 12        // seconds between automatic changes
+  interval: 12        
 };
 
-/* ============================================================================
-   FOOTPRINT HELPERS — a footprint is a list of runs; a run is a list of
-   [x, z] points along which a wall is swept. Sharp corners split runs, so
-   normals stay crisp at a corner and smooth round a curve.
-   ========================================================================== */
 function arcPts(cx, cz, r, a0, a1, n) {
   const out = [];
   for (let i = 0; i <= n; i++) {
@@ -76,7 +51,6 @@ function joinPts(...lists) {
   return out;
 }
 
-/* tangent, outward normal and running length at every point of a run */
 function frameRun(run, centroid) {
   const n = run.length, s = [0], nx = [], nz = [];
   for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(run[i][0] - run[i - 1][0], run[i][1] - run[i - 1][1]));
@@ -86,7 +60,7 @@ function frameRun(run, centroid) {
     const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
     nx.push(tz); nz.push(-tx);
   }
-  /* point the normals away from the middle of the footprint */
+
   const m = Math.floor(n / 2);
   const mx = (run[Math.max(0, m - 1)][0] + run[m][0]) / 2, mz = (run[Math.max(0, m - 1)][1] + run[m][1]) / 2;
   if (nx[m] * (mx - centroid[0]) + nz[m] * (mz - centroid[1]) < 0) {
@@ -95,7 +69,6 @@ function frameRun(run, centroid) {
   return { s, nx, nz, len: s[n - 1] };
 }
 
-/* a glazed wall swept along a run, drawn by the facade shader */
 function wallAlong(run, centroid, y0, floors, name) {
   const f = frameRun(run, centroid);
   const bays = Math.max(1, Math.round(f.len / BAY.w));
@@ -111,7 +84,7 @@ function wallAlong(run, centroid, y0, floors, name) {
       seed.push(sd);
     }
   }
-  /* wind the triangles so their front faces point along the outward normal */
+  
   const tx = run[1][0] - run[0][0], tz = run[1][1] - run[0][1];
   const flip = (-tz * f.nx[0] + tx * f.nz[0]) < 0;
   for (let i = 0; i < run.length - 1; i++) {
@@ -130,7 +103,6 @@ function wallAlong(run, centroid, y0, floors, name) {
   return m;
 }
 
-/* a quad strip between two point lists, used for slab edges and parapets */
 function strip(A, B) {
   const pos = [], idx = [];
   for (let i = 0; i < A.length; i++) pos.push(...A[i], ...B[i]);
@@ -144,7 +116,7 @@ function strip(A, B) {
   return g;
 }
 
-/* a slab edge that stands proud of the wall: outer face, top and underside */
+// Slab
 function bandAlong(run, centroid, y, h, out, mat, name) {
   const f = frameRun(run, centroid);
   const inner = [], outer = [];
@@ -165,7 +137,7 @@ function bandAlong(run, centroid, y, h, out, mat, name) {
   return tag(g, name || 'Floor slab edge');
 }
 
-/* a flat roof over a closed outline */
+// Roof
 function roofCap(outline, y, mat) {
   const shape = new THREE.Shape(outline.map(p => new THREE.Vector2(p[0], -p[1])));
   const g = new THREE.ShapeGeometry(shape, 8);
@@ -179,7 +151,7 @@ function roofCap(outline, y, mat) {
   return m;
 }
 
-/* box whose uv are in metres / scale on every face, so textures keep their size */
+// Box
 function box(w, h, d, mat, scale) {
   const g = new THREE.BoxGeometry(w, h, d);
   const uv = g.attributes.uv, k = scale || 4;
@@ -197,7 +169,7 @@ function trimMaterial() {
   return m;
 }
 
-/* the whole glazed block: walls, a slab edge at every floor, parapet, roof */
+// Block
 function glazedBlock(runs, outline, centroid, floors, opts) {
   const g = new THREE.Group();
   const trim = trimMaterial();
@@ -213,9 +185,7 @@ function glazedBlock(runs, outline, centroid, floors, opts) {
 
 let roofMat;
 
-/* ============================================================================
-   THE PARTS OF THE CAMPUS
-   ========================================================================== */
+// Campus
 function buildRedTower(g) {
   const terracotta = new THREE.MeshStandardMaterial({ map: TEX.terracotta, roughness: 0.8 });
   const slab = box(5, TOWER_TOP, 16, terracotta, 4);
@@ -227,7 +197,7 @@ function buildRedTower(g) {
   cap.userData.part = 'Terracotta tower';
   g.add(cap);
 
-  /* a column of deep set windows on the front and a slit on the side */
+  // Windows
   const glass = new THREE.MeshStandardMaterial({ color: 0x5f8792, metalness: 0.35, roughness: 0.18, emissive: 0xffcf8f, emissiveIntensity: 0 });
   towerWindowMat = glass;
   for (let k = 0; k < 8; k++) {
@@ -245,7 +215,7 @@ function buildRedTower(g) {
 let towerWindowMat;
 
 function buildGlassBlock(g) {
-  /* rectangle with its front corner toward the stairs rounded off */
+  // Footprint
   const outline = joinPts([[-17, -8], [-8, -8], [-8, 2]], arcPts(-12, 2, 4, 0, Math.PI / 2, 16), [[-17, 6]]);
   const runs = [
     [[-17, -8], [-8, -8]],
@@ -265,8 +235,6 @@ function buildWhiteBlock(g) {
   ];
   g.add(glazedBlock(runs, outline, centroid, 6, { name: 'Curved white block', band: 0.7, parapet: 0.8 }));
 
-  /* the first floor sweeps out over the forecourt as a curved canopy, held
-     up by round columns */
   const front = runs[0];
   const f = frameRun(front, centroid);
   const from = front.findIndex((p, i) => f.s[i] / f.len > 0.34);
@@ -284,7 +252,7 @@ function buildWhiteBlock(g) {
     g.add(c);
   }
 
-  /* a terracotta panel at the foot, as in the photograph */
+  // Panel
   const panel = box(5.5, 3.0, 0.4, new THREE.MeshStandardMaterial({ map: TEX.terracotta, roughness: 0.8 }), 3);
   panel.position.set(20.5, 1.5, 7.85);
   panel.userData.part = 'Terracotta panel';
@@ -296,7 +264,7 @@ function buildBackBlock(g) {
   const runs = [[[-8, -8], [8, -8]], [[8, -8], [8, -17]], [[8, -17], [-8, -17]], [[-8, -17], [-8, -8]]];
   g.add(glazedBlock(runs, outline, [0, -12.5], 5, { name: 'Academic block', band: 0.3, parapet: 0.4 }));
 
-  /* glass entrance doors onto the raised court */
+  // Doors
   const doorMat = new THREE.MeshStandardMaterial({ map: TEX.door, roughness: 0.25, metalness: 0.3 });
   for (const x of [-4.8, 0, 4.8]) {
     const d = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 3.1), doorMat);
@@ -313,7 +281,7 @@ function buildCourtAndStairs(g) {
   court.userData.part = 'Raised court';
   g.add(court);
 
-  /* twelve steps from the forecourt up to the court */
+  // Steps
   const steps = 12, rise = COURT_Y / steps, tread = 0.8;
   const stepMat = new THREE.MeshStandardMaterial({ map: TEX.concreteLight, color: 0xe4e1da, roughness: 0.65 });
   for (let i = 0; i < steps; i++) {
@@ -324,7 +292,7 @@ function buildCourtAndStairs(g) {
     g.add(s);
   }
 
-  /* terracotta planters stepping down both sides, with shrubs */
+  // Planters
   const run = steps * tread;
   const shape = new THREE.Shape();
   shape.moveTo(0, 0); shape.lineTo(run, 0); shape.lineTo(run, 0.8); shape.lineTo(0, COURT_Y + 0.6); shape.closePath();
@@ -349,7 +317,7 @@ function buildCourtAndStairs(g) {
       b.userData.part = 'Shrub';
       g.add(b);
     }
-    /* a hand rail on the inner edge of each planter */
+    // Rail
     const xi = x < 0 ? -6.95 : 6.95;
     const top = new THREE.Vector3(xi, COURT_Y + 0.9, 6), bottom = new THREE.Vector3(xi, 0.9, 6 + run);
     g.add(rod(top, bottom, 0.035, steel, 8));
@@ -359,7 +327,7 @@ function buildCourtAndStairs(g) {
     }
   }
 
-  /* a tall climbing plant against the left pier, as in the photograph */
+  // Plant
   const climber = shadowed(new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), leaf));
   climber.scale.set(1.1, 3.4, 1.0);
   climber.position.set(-9.3, 3.4, 8.2);
@@ -367,11 +335,7 @@ function buildCourtAndStairs(g) {
   g.add(climber);
 }
 
-/* ---------------------------------------------------------------------------
-   THE ARCH — a segmental vault over the stairs. A heavy front rib carries
-   the name board, lighter ribs repeat behind it, long ribs run the length,
-   and a translucent skin closes the top.
-   --------------------------------------------------------------------------- */
+// Arch
 function buildArch(g) {
   const half = 8.2, spring = 7.0, crown = 12.5;
   const R = (half * half + (crown - spring) ** 2) / (2 * (crown - spring));
@@ -415,7 +379,7 @@ function buildArch(g) {
   skin.userData.part = 'Arch canopy';
   g.add(skin);
 
-  /* round piers under the front rib */
+  // Piers
   for (const x of [-half, half]) {
     const p = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, spring + 0.3, 20), white));
     p.position.set(x, (spring + 0.3) / 2, zFront);
@@ -423,7 +387,7 @@ function buildArch(g) {
     g.add(p);
   }
 
-  /* the name board stands on the crown of the front rib */
+  // Nameboard
   const board = new THREE.Group();
   const back = box(12.6, 1.3, 0.25, white, 4);
   board.add(back);
@@ -486,7 +450,7 @@ function buildRoofPlant(g) {
   beacon.userData.part = 'Aircraft beacon';
   g.add(beacon);
 
-  /* solar panels on the academic block */
+  // Solar
   const solarMat = new THREE.MeshStandardMaterial({ map: TEX.solar, metalness: 0.3, roughness: 0.25 });
   const sy = 5 * STOREY + 0.2;
   for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) {
@@ -512,7 +476,7 @@ function buildBuilding() {
   scene.add(building);
 }
 
-/* start wiping a new skin up the building; ignored while a wipe is running */
+// Wipe
 function requestSkin(i) {
   if (facade.busy) return false;
   const n = SKINS.length;
@@ -533,7 +497,7 @@ function updateFacade(dt, time) {
     facade.t += dt;
     const p = Math.min(facade.t / facade.dur, 1);
     u.uMix.value = p;
-    /* the slab edges follow the wipe as it reaches the top */
+    // Slabs
     _ca.setHex(SKINS[facade.index].trim);
     _cb.setHex(SKINS[facade.next].trim);
     const k = smoothstep(0.55, 0.95, p);
@@ -541,7 +505,7 @@ function updateFacade(dt, time) {
     if (p >= 1) {
       facade.index = facade.next;
       u.uSkinA.value = TEX.skins[facade.index];
-      /* keep uSkinB in sync so the next wipe starts from the correct base skin */
+      // Sync
       u.uSkinB.value = TEX.skins[facade.index];
       u.uMix.value = 0;
       facade.busy = false;
@@ -560,8 +524,6 @@ function updateRoof(dt, time) {
   beaconMat.emissiveIntensity = on ? 6 : 0.2;
 }
 
-/* night: the shader lights the rooms and a few surfaces glow. None of these
-   is a light source; they are emissive, so they light nothing around them */
 function setNight(v) {
   facadeMat.uniforms.uNight.value = v;
   signFaceMat.emissiveIntensity = v * 0.9;
